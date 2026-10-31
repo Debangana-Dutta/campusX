@@ -64,7 +64,7 @@ class DecisionIn(BaseModel):
 
 
 class DisruptionIn(BaseModel):
-    changes: list[dict[str, Any]] = Field(min_length=1)
+    changes: list[dict[str, Any]] = Field(min_length=1, max_length=200)
     description: str = ""
     time_limit_s: int = Field(default=90, ge=10, le=270)
 
