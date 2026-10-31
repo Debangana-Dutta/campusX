@@ -25,6 +25,7 @@ export default function Disruptions() {
   const [res, setRes] = useState(null)
   const [confirm, setConfirm] = useState(false)
   const [applied, setApplied] = useState(false)
+  const [rejected, setRejected] = useState(false)
   const file = useRef(null)
 
   const load = (raw) => {
@@ -43,18 +44,25 @@ export default function Disruptions() {
   }
   const sample = async () => { try { load(JSON.stringify(await api.sampleDisruption())) } catch (e) { toast(e.message, 'error') } }
   const preview = async () => {
-    setBusy(true); setRes(null); setApplied(false)
+    setBusy(true); setRes(null); setApplied(false); setRejected(false)
     try { setRes(await api.previewDisruption(changes, +limit)); hist.reload() } catch (e) { toast(e.message, 'error') } finally { setBusy(false) }
   }
   const apply = async () => {
     setBusy(true)
     try { await api.applyDisruption(res.id); setApplied(true); toast('Change applied. Everyone has been notified.', 'ok'); hist.reload() } catch (e) { toast(e.message, 'error') } finally { setBusy(false); setConfirm(false) }
   }
+  const open = async (id) => {
+    try { const d = await api.disruptionComparison(id); setApplied(d.status === 'applied'); setRejected(d.status === 'rejected'); setRes({ id: d.id, status: d.status, feasible: d.proposal.feasible !== false, ...d.proposal }); window.scrollTo({ top: 0, behavior: 'smooth' }) } catch (e) { toast(e.message, 'error') }
+  }
+  const reject = async () => {
+    setBusy(true)
+    try { await api.rejectDisruption(res.id, ''); setRejected(true); toast('Proposal rejected. The timetable is unchanged.', 'ok'); hist.reload() } catch (e) { toast(e.message, 'error') } finally { setBusy(false) }
+  }
   const stage = !res ? -1 : !res.feasible ? 0 : applied ? 4 : res.validation?.accepted ? 2 : 1
   const movedSet = new Set((res?.moved || []).map((m) => m.session_id))
   return (
     <>
-      <PageHeader title="Disruption Management" subtitle="Load a change file, preview the minimum-movement repair, check the official validation, then approve. Nothing is applied automatically." />
+      <PageHeader title="Schedule Changes" subtitle="Load a change file, preview the proposed timetable, then approve. Nothing is applied until an admin approves." />
       <ol className="mb-5 flex flex-wrap gap-2" aria-label="Workflow">{FLOW.map((s, i) => <li key={s}><Pill tone={i <= stage ? 'ok' : 'neutral'}>{i + 1}. {s}</Pill></li>)}</ol>
       <div className="grid gap-5 xl:grid-cols-2">
         <Card>
@@ -81,8 +89,9 @@ export default function Disruptions() {
               <div className="flex flex-wrap items-center gap-2"><Pill tone={res.validation.accepted ? 'ok' : 'bad'}><ShieldCheck className="h-3.5 w-3.5" />Official validator: {res.validation.accepted ? 'accepted' : 'NOT accepted'}</Pill>
                 <Pill>{res.validation.hard_violation_count} hard violations</Pill><Pill>soft {res.soft_before} &rarr; {res.soft_after}</Pill><Pill tone={statusTone(res.status)}>{titleCase(res.status)}</Pill></div>
               {res.validation.stability && <p className="text-xs text-muted">Validator stability: {res.validation.stability.sessions_moved} moved ({res.validation.stability.time_changed} time, {res.validation.stability.room_only_changed} room-only).</p>}
-              <Btn variant="mint" disabled={!res.validation.accepted || applied} onClick={() => setConfirm(true)}><Stamp className="h-4 w-4" />{applied ? 'Applied' : 'Admin approve and apply'}</Btn>
-              {!res.validation.accepted && <p className="text-sm font-bold text-bad">This proposal failed official validation and cannot be applied.</p>}
+              <div className="flex flex-wrap gap-2"><Btn variant="mint" disabled={!res.validation.accepted || applied || rejected} onClick={() => setConfirm(true)}><Stamp className="h-4 w-4" />{applied ? 'Applied' : 'Admin approve and apply'}</Btn>
+                <Btn disabled={applied || rejected} onClick={reject}>{rejected ? 'Rejected' : 'Reject proposal'}</Btn></div>
+              {!res.validation.accepted && <p className="text-sm font-bold text-danger">This proposal failed official validation and cannot be applied.</p>}
             </div>)}
         </Card>
       </div>
@@ -110,7 +119,7 @@ export default function Disruptions() {
         </div>)}
 
       <Card className="mt-5"><h2 className="mb-3 text-lg font-extrabold text-navy">History</h2>
-        {!hist.data?.disruptions?.length ? <Empty title="No disruptions yet" /> : <Table head={['ID', 'Status', 'Requested by', 'Moved', 'Created']}>{hist.data.disruptions.map((d) => <tr key={d.id}><td className="td font-bold text-navy">{d.id}</td><td className="td"><Pill tone={statusTone(d.status)}>{titleCase(d.status)}</Pill></td><td className="td">{d.requested_by}</td><td className="td">{d.moved ?? '-'}</td><td className="td">{new Date(d.created_at).toLocaleString()}</td></tr>)}</Table>}</Card>
+        {!hist.data?.disruptions?.length ? <Empty title="No disruptions yet" /> : <Table head={['ID', 'Status', 'Requested by', 'Moved', 'Created', '']}>{hist.data.disruptions.map((d) => <tr key={d.id}><td className="td font-bold text-navy">{d.id}</td><td className="td"><Pill tone={statusTone(d.status)}>{titleCase(d.status)}</Pill></td><td className="td">{d.requested_by}</td><td className="td">{d.moved ?? '-'}</td><td className="td">{new Date(d.created_at).toLocaleString()}</td><td className="td"><Btn onClick={() => open(d.id)} aria-label={`Review ${d.id}`}>Review</Btn></td></tr>)}</Table>}</Card>
       <Modal open={confirm} onClose={() => setConfirm(false)} title="Apply this change?" footer={<><Btn onClick={() => setConfirm(false)}>Not yet</Btn><Btn variant="primary" loading={busy} onClick={apply}>Approve and apply</Btn></>}>
         <p>This replaces the live timetable. {res?.summary?.moved} session(s) move; the official validator has accepted the result. Everyone is notified.</p></Modal>
     </>

@@ -22,8 +22,7 @@ export function Field({ label, id, hint, children }) {
   return <div><label htmlFor={id} className="label">{label}</label>{children}{hint && <p className="mt-1 text-xs text-muted">{hint}</p>}</div>
 }
 
-const TONES = { ok: 'bg-mint/70 text-[#14513f] dark:text-mint', warn: 'bg-peach/70 text-[#6b3a14] dark:text-peach', bad: 'bg-rose/70 text-[#7a1f3a] dark:text-rose',
-  info: 'bg-peri/60 text-[#1b2559] dark:text-peri', lav: 'bg-lavender/60 text-[#2f2670] dark:text-lavender', neutral: 'bg-surface text-muted' }
+const TONES = { ok: 'tone-ok', warn: 'tone-warn', bad: 'tone-bad', info: 'tone-info', lav: 'tone-lav', neutral: 'tone-neutral' }
 export const Pill = ({ tone = 'neutral', children, className = '' }) => <span className={`pill ${TONES[tone]} ${className}`}>{children}</span>
 
 export const statusTone = (s) => ({ approved: 'ok', confirmed: 'ok', validated: 'info', accepted: 'ok', draft: 'warn', invalid: 'bad', rejected: 'bad',
@@ -54,7 +53,7 @@ export function Empty({ title = 'Nothing here yet', hint, icon: I = Inbox, actio
 export function ErrorState({ error, onRetry }) {
   return (
     <div className="clay flex flex-col items-center gap-3 px-6 py-10 text-center" role="alert">
-      <AlertTriangle className="h-10 w-10 text-bad" />
+      <AlertTriangle className="h-10 w-10 text-danger" />
       <p className="text-lg font-bold text-navy">Something went wrong</p>
       <p className="max-w-lg text-sm text-muted">{error?.message || 'Unexpected error'}</p>
       {onRetry && <Btn onClick={onRetry}><RefreshCw className="h-4 w-4" />Try again</Btn>}
@@ -118,7 +117,7 @@ export function Table({ head, children, className = '' }) {
 export const Toggle = ({ checked, onChange, label }) => (
   <label className="flex cursor-pointer items-center gap-3 text-sm font-bold text-navy">
     <input type="checkbox" className="peer sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-    <span className="clay-inset relative h-7 w-12 rounded-full p-0.5 transition peer-checked:bg-mint/60 peer-focus-visible:ring-2 peer-focus-visible:ring-accent">
+    <span className="clay-inset relative h-7 w-12 rounded-full p-0.5 transition peer-checked:tone-ok peer-focus-visible:ring-2 peer-focus-visible:ring-accent">
       <span className={`clay-sm block h-6 w-6 rounded-full transition-transform ${checked ? 'translate-x-5' : ''}`} /></span>{label}
   </label>
 )

@@ -5,9 +5,9 @@ export const periodEnd = (p) => { const [h] = PERIOD_TIME[p].split(':'); return 
 export const span = (a, b) => `${PERIOD_TIME[a]}-${periodEnd(b)}`
 export const titleCase = (s = '') => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
-// restrained pastel course colours (same set in light/dark; text colour comes from CSS vars)
-const PALETTE = ['bg-lavender/70', 'bg-mint/70', 'bg-peach/70', 'bg-peri/70', 'bg-sky/70', 'bg-rose/70']
-export const courseColor = (id = '') => { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PALETTE[h % PALETTE.length] }
+// one stable colour per course (same course = same colour in every view and theme)
+export const courseIndex = (id = '') => { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 12 }
+export const courseColor = (id = '') => `cc-${courseIndex(id)}`
 
 export function toCsv(rows) {
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`

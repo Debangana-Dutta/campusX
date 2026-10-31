@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { UserPlus } from 'lucide-react'
+import { Check, UserPlus, X } from 'lucide-react'
 import { api } from '../services/api'
 import { useApi } from '../hooks/useApi'
 import { useToast } from '../contexts/AppContexts'
-import { Async, Btn, Card, Empty, Field, PageHeader, Pill, Table } from '../components/ui'
+import { Async, Btn, Card, Empty, Field, PageHeader, Pill, Table, statusTone } from '../components/ui'
 import { titleCase } from '../utils/format'
 
 export default function Users() {
@@ -11,25 +11,32 @@ export default function Users() {
   const u = useApi(api.users, [])
   const au = useApi(api.audit, [])
   const [f, setF] = useState({ user_id: '', role: 'faculty' })
-  const [busy, setBusy] = useState(false)
-  const assign = async (e) => { e.preventDefault(); setBusy(true); try { await api.assignRole(f.user_id.trim(), f.role); toast('Role assignment recorded', 'ok'); setF({ ...f, user_id: '' }); u.reload(); au.reload() } catch (x) { toast(x.message, 'error') } finally { setBusy(false) } }
+  const [busy, setBusy] = useState('')
+  const decide = async (email, action, role) => { setBusy(email); try { await api.decideAccount(email, action, role); toast(action === 'approve' ? 'Account approved' : 'Request declined', 'ok'); u.reload(); au.reload() } catch (x) { toast(x.message, 'error') } finally { setBusy('') } }
+  const assign = async (e) => { e.preventDefault(); try { await api.assignRole(f.user_id.trim(), f.role); toast('Role assignment recorded', 'ok'); setF({ ...f, user_id: '' }); u.reload() } catch (x) { toast(x.message, 'error') } }
   return (
     <>
-      <PageHeader title="User Management" subtitle="Roles are enforced by the backend. Nobody can assign or change their own role." />
-      <Async state={u} rows={2}>{(d) => (
-        <div className="grid gap-5">
-          <Card><Pill tone="warn" className="mb-3">{d.auth_mode === 'local' ? 'Local demo authentication' : 'Supabase authentication'}</Pill><p className="mb-3 text-sm text-muted">{d.note}</p>
-            {d.accounts.length > 0 && <Table head={['Username', 'Name', 'Role', 'Department']}>{d.accounts.map((a) => <tr key={a.username}><td className="td font-bold text-navy">{a.username}</td><td className="td">{a.name}</td><td className="td"><Pill tone="lav">{titleCase(a.role)}</Pill></td><td className="td">{a.department || '-'}</td></tr>)}</Table>}</Card>
-          <div className="grid gap-5 lg:grid-cols-2">
-            <Card as="form" onSubmit={assign} className="grid h-fit gap-3" aria-label="Assign role"><h2 className="text-lg font-extrabold text-navy">Record a role assignment</h2>
-              <Field label="User ID" id="uid"><input id="uid" required className="field" value={f.user_id} onChange={(e) => setF({ ...f, user_id: e.target.value })} /></Field>
-              <Field label="Role" id="role"><select id="role" className="field" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}>{['admin', 'faculty', 'department_coordinator', 'club_representative'].map((r) => <option key={r} value={r}>{titleCase(r)}</option>)}</select></Field>
-              <Btn type="submit" variant="primary" loading={busy}><UserPlus className="h-4 w-4" />Assign</Btn></Card>
-            <Card><h2 className="mb-3 text-lg font-extrabold text-navy">Role assignments</h2>{d.role_assignments.length ? <Table head={['User', 'Role', 'Granted by']}>{d.role_assignments.map((r, i) => <tr key={i}><td className="td">{r.user_id}</td><td className="td">{titleCase(r.role)}</td><td className="td">{r.granted_by}</td></tr>)}</Table> : <Empty title="None recorded" />}</Card>
-          </div>
-          <Card><h2 className="mb-3 text-lg font-extrabold text-navy">Audit log (latest)</h2>
-            <Async state={au} rows={1} emptyIf={(x) => !x.events.length} empty={<Empty title="No events yet" />}>{(x) => <Table head={['When', 'Actor', 'Action', 'Subject']}>{x.events.slice(0, 40).map((e) => <tr key={e.id}><td className="td whitespace-nowrap">{new Date(e.at).toLocaleString()}</td><td className="td">{e.actor}</td><td className="td"><Pill tone="info">{e.action}</Pill></td><td className="td">{e.subject}</td></tr>)}</Table>}</Async></Card>
-        </div>)}</Async>
+      <PageHeader title="Users" subtitle="Review access requests and see who can sign in. Nobody can change their own role." />
+      <Async state={u} rows={2}>{(d) => {
+        const pending = d.accounts.filter((a) => a.status === 'pending')
+        return (
+          <div className="grid gap-6">
+            <Card><h2 className="mb-3 text-lg font-bold text-navy">Access requests {pending.length > 0 && <Pill tone="warn">{pending.length} waiting</Pill>}</h2>
+              {pending.length === 0 ? <Empty title="No requests waiting" /> : <Table head={['Name', 'Email', 'Requested role', 'Department', '']}>{pending.map((a) => (
+                <tr key={a.email}><td className="td font-semibold text-navy">{a.name}</td><td className="td">{a.email}</td><td className="td"><Pill tone="lav">{titleCase(a.requested_role || a.role)}</Pill></td><td className="td">{a.department || '-'}</td>
+                  <td className="td"><div className="flex gap-2"><Btn variant="mint" loading={busy === a.email} onClick={() => decide(a.email, 'approve')}><Check className="h-4 w-4" />Approve</Btn><Btn onClick={() => decide(a.email, 'reject')}><X className="h-4 w-4" />Decline</Btn></div></td></tr>))}</Table>}</Card>
+            <Card><h2 className="mb-3 text-lg font-bold text-navy">All accounts</h2>
+              <Table head={['Name', 'Email', 'Role', 'Status']}>{d.accounts.map((a) => <tr key={a.email}><td className="td font-semibold text-navy">{a.name}</td><td className="td">{a.email}</td><td className="td">{titleCase(a.role)}</td><td className="td"><Pill tone={a.status === 'active' ? 'ok' : statusTone(a.status)}>{titleCase(a.status)}</Pill></td></tr>)}</Table></Card>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card as="form" onSubmit={assign} className="grid h-fit gap-3" aria-label="Record role assignment"><h2 className="text-lg font-bold text-navy">Record a role assignment</h2>
+                <Field label="User ID" id="uid"><input id="uid" required className="field" value={f.user_id} onChange={(e) => setF({ ...f, user_id: e.target.value })} /></Field>
+                <Field label="Role" id="role"><select id="role" className="field" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}>{['faculty', 'department_coordinator', 'club_representative'].map((r) => <option key={r} value={r}>{titleCase(r)}</option>)}</select></Field>
+                <Btn type="submit" variant="primary"><UserPlus className="h-4 w-4" />Record</Btn></Card>
+              <Card><h2 className="mb-3 text-lg font-bold text-navy">Recent activity</h2>
+                <Async state={au} rows={1} emptyIf={(x) => !x.events.length} empty={<Empty title="No activity yet" />}>{(x) => <Table head={['When', 'Who', 'Action']}>{x.events.slice(0, 12).map((e) => <tr key={e.id}><td className="td whitespace-nowrap">{new Date(e.at).toLocaleString()}</td><td className="td">{e.actor}</td><td className="td"><Pill tone="info">{e.action}</Pill></td></tr>)}</Table>}</Async></Card>
+            </div>
+          </div>)
+      }}</Async>
     </>
   )
 }

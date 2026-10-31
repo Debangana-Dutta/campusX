@@ -1,11 +1,9 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { Bell, Bot, CalendarCheck, CalendarX2, ClipboardCheck, GraduationCap, Send, ShieldCheck, Sparkles, Wand2 } from 'lucide-react'
+import { GraduationCap, ShieldCheck } from 'lucide-react'
 import { api } from '../services/api'
 import { useApi } from '../hooks/useApi'
 import { useAuth } from '../contexts/AppContexts'
-import { Async, Btn, Card, Empty, PageHeader, Pill, Stat, statusTone } from '../components/ui'
+import { Async, Card, Empty, PageHeader, Pill, statusTone } from '../components/ui'
 import { DAY_NAMES, PERIOD_TIME, periodEnd, titleCase } from '../utils/format'
 
 const JS_DAY = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
@@ -27,23 +25,6 @@ function ClassList({ entries, title, empty }) {
   )
 }
 
-function MiniBuddy() {
-  const [q, setQ] = useState('')
-  const [ans, setAns] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const ask = async (e) => { e.preventDefault(); if (!q.trim()) return; setBusy(true); try { setAns(await api.ask(q)) } catch (x) { setAns({ answer: x.message }) } finally { setBusy(false) } }
-  return (
-    <Card>
-      <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-navy"><Bot className="h-5 w-5 text-accent" />Campus Buddy</h2>
-      <form onSubmit={ask} className="flex gap-2"><label htmlFor="mb" className="sr-only">Ask Campus Buddy</label>
-        <input id="mb" className="field" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Aaj meri next class kaha hai?" />
-        <Btn type="submit" variant="primary" loading={busy} aria-label="Ask"><Send className="h-4 w-4" /></Btn></form>
-      {ans && <p className="clay-inset mt-3 p-3 text-sm text-ink">{ans.answer}</p>}
-      <Link to="/app/buddy" className="mt-3 inline-block text-sm font-bold text-accent">Open full chat</Link>
-    </Card>
-  )
-}
-
 function StudentFacultyHome({ user }) {
   const isStudent = user.role === 'student'
   const tt = useApi(() => (isStudent ? api.groupTimetable(user.group_id) : api.timetable()), [])
@@ -60,8 +41,7 @@ function StudentFacultyHome({ user }) {
           <div className="grid gap-5 lg:grid-cols-2">
             {t === 'SAT' || t === 'SUN' ? <Card><h2 className="mb-1 text-lg font-extrabold text-navy">Today</h2><Empty title={`No classes on ${DAY_NAMES[t]}`} hint="The teaching week runs Monday to Friday." /></Card>
               : <ClassList entries={todays} title={`Today (${DAY_NAMES[t]})`} empty="No classes today" />}
-            <MiniBuddy />
-            <Card><h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-navy"><ShieldCheck className="h-5 w-5 text-ok" />Timetable status</h2>
+            <Card><h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-navy"><ShieldCheck className="h-5 w-5 text-ok" />Timetable</h2>
               <Pill tone={statusTone(d.status)}>{titleCase(d.status || 'unknown')}</Pill><p className="mt-2 text-sm text-muted">{mine.length} session(s) a week.</p>
               <Link to="/app/timetable" className="mt-3 inline-block text-sm font-bold text-accent">Open full timetable</Link></Card>
             {isStudent && <Card><h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-navy"><GraduationCap className="h-5 w-5 text-accent" />Upcoming exams</h2>
@@ -74,38 +54,40 @@ function StudentFacultyHome({ user }) {
   )
 }
 
+function Row({ label, count, to, hint }) {
+  return (
+    <li className="flex items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3">
+      <div className="min-w-0"><p className="font-semibold text-navy">{label}</p>{hint && <p className="text-xs text-muted">{hint}</p>}</div>
+      <div className="flex items-center gap-3"><span className={`text-xl font-bold ${count ? 'text-accent' : 'text-muted'}`}>{count}</span>
+        <Link to={to} className="btn !min-h-0 !px-3 !py-1.5 text-xs">Open</Link></div>
+    </li>
+  )
+}
+
 function StaffHome({ user }) {
   const s = useApi(api.summary, [])
   const mine = useApi(api.bookings, [], { enabled: user.role === 'club_representative' })
+  const reviewer = user.role === 'admin' || user.role === 'department_coordinator'
   return (
     <>
-      <PageHeader title={`Hello, ${user.name.split(' ')[0]}`} subtitle="Live figures from the backend. Nothing on this page is hard-coded." />
-      <Async state={s} rows={3}>{(d) => (
-        <div className="grid gap-5">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Stat icon={CalendarCheck} tone="mint" label="Sessions scheduled" value={`${d.sessions_scheduled} / ${d.sessions_total}`} hint={`Timetable ${d.timetable_status}`} />
-            <Stat icon={ShieldCheck} tone="lavender" label="Official validation" value={d.validation ? (d.validation.accepted ? 'Accepted' : 'Rejected') : 'Not run'} hint={d.validation ? `${d.validation.hard_violation_count} hard violations, soft ${d.validation.soft_total}` : ''} />
-            <Stat icon={ClipboardCheck} tone="peach" label="Pending bookings" value={d.pending_bookings} hint={`${d.user_bookings} user request(s) total`} />
-            <Stat icon={CalendarX2} tone="peri" label="Active disruptions" value={d.active_disruptions} hint={`${d.applied_disruptions} applied`} />
-          </div>
-          <div className="grid gap-5 lg:grid-cols-3">
-            <Card className="lg:col-span-2">
-              <h2 className="mb-1 text-lg font-extrabold text-navy">Spectra week booking outcomes</h2><p className="mb-3 text-xs text-muted">Decisions made by the booking engine for the dataset's requests{d.booking_score != null ? `; validator booking score ${d.booking_score}` : ''}.</p>
-              <div className="h-52"><ResponsiveContainer><BarChart data={[{ n: 'Approved', v: d.spectra.approved }, { n: 'Alternative', v: d.spectra.alternative }, { n: 'Rejected', v: d.spectra.rejected }]}>
-                <XAxis dataKey="n" tick={{ fill: 'currentColor', fontSize: 12 }} axisLine={false} tickLine={false} /><YAxis allowDecimals={false} tick={{ fill: 'currentColor', fontSize: 12 }} axisLine={false} tickLine={false} width={28} /><Tooltip cursor={false} />
-                <Bar dataKey="v" radius={[10, 10, 10, 10]}>{['#9ad9bf', '#b9a6ff', '#ffb3c6'].map((c) => <Cell key={c} fill={c} />)}</Bar></BarChart></ResponsiveContainer></div>
-            </Card>
-            <Card><h2 className="mb-3 text-lg font-extrabold text-navy">Shortcuts</h2>
-              <div className="grid gap-2.5">
-                {user.role === 'admin' && <Link className="btn btn-primary" to="/app/generate"><Wand2 className="h-4 w-4" />Generate timetable</Link>}
-                {user.role === 'admin' && <Link className="btn" to="/app/disruptions"><CalendarX2 className="h-4 w-4" />Preview a disruption</Link>}
-                <Link className="btn" to="/app/bookings"><ClipboardCheck className="h-4 w-4" />Bookings</Link>
-                <Link className="btn" to="/app/buddy"><Sparkles className="h-4 w-4" />Ask Campus Buddy</Link>
-                <Link className="btn" to="/app/notifications"><Bell className="h-4 w-4" />Notifications</Link>
-              </div></Card>
-          </div>
-          {user.role === 'club_representative' && <Card><h2 className="mb-3 text-lg font-extrabold text-navy">My requests</h2>
-            <Async state={mine} rows={1} emptyIf={(x) => !x.count} empty={<Empty title="No requests yet" hint="Use Request a Venue to submit one." />}>{(m) => <ul className="grid gap-2">{m.bookings.slice(0, 5).map((b) => <li key={b.id} className="clay-sm flex items-center justify-between gap-3 p-3 text-sm"><span className="truncate font-bold text-navy">{b.request.title}</span><Pill tone={statusTone(b.state)}>{titleCase(b.state)}</Pill></li>)}</ul>}</Async></Card>}
+      <PageHeader title={`Hello, ${user.name.split(' ')[0]}`} actions={user.role === 'club_representative' ? <Link className="btn btn-primary" to="/app/request-venue">Request a venue</Link> : user.role === 'admin' ? <Link className="btn btn-primary" to="/app/generate">Timetable Generator</Link> : null} />
+      <Async state={s} rows={2}>{(d) => (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {reviewer && (
+            <Card><h2 className="mb-3 text-lg font-bold text-navy">Needs your attention</h2>
+              <ul className="grid gap-2">
+                <Row label="Requests to review" count={d.pending_bookings} to="/app/bookings" hint="Room bookings waiting for a decision" />
+                {user.role === 'admin' && <Row label="Account requests" count={d.pending_accounts} to="/app/users" />}
+                {user.role === 'admin' && <Row label="Schedule changes to approve" count={d.active_disruptions} to="/app/disruptions" />}
+              </ul></Card>)}
+          <Card><h2 className="mb-3 text-lg font-bold text-navy">Timetable</h2>
+            <div className="flex flex-wrap items-center gap-2"><Pill tone={statusTone(d.timetable_status)}>{titleCase(d.timetable_status)}</Pill>
+              <span className="text-sm text-muted">{d.sessions_scheduled} of {d.sessions_total} sessions scheduled</span></div>
+            {d.validation && <p className="mt-3 text-sm text-ink">Official validator: <b>{d.validation.accepted ? 'accepted' : 'not accepted'}</b> · {d.validation.hard_violation_count} clashes · soft penalty {d.validation.soft_total}</p>}
+            <p className="mt-1 text-sm text-muted">{d.exams_scheduled} of {d.exams_total} exams scheduled</p>
+            <Link to="/app/timetable" className="mt-3 inline-block text-sm font-bold text-accent">Open timetable</Link></Card>
+          {user.role === 'club_representative' && <Card className="lg:col-span-2"><h2 className="mb-3 text-lg font-bold text-navy">My requests</h2>
+            <Async state={mine} rows={1} emptyIf={(x) => !x.count} empty={<Empty title="No requests yet" hint="Use Request a venue to send one." />}>{(m) => <ul className="grid gap-2">{m.bookings.slice(0, 5).map((b) => <li key={b.id} className="flex items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3 text-sm"><span className="truncate font-semibold text-navy">{b.request.title}</span><Pill tone={statusTone(b.state)}>{titleCase(b.state)}</Pill></li>)}</ul>}</Async></Card>}
         </div>)}</Async>
     </>
   )

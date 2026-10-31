@@ -22,7 +22,7 @@ async function request(path, { method = 'GET', body, auth = true, raw = false } 
   try {
     res = await fetch(`${BASE}/api${path}`, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined })
   } catch {
-    throw new ApiError(0, 'Cannot reach the Campus X server. Check your connection or try again shortly.')
+    throw new ApiError(0, 'Cannot reach the OptiCampus server. Check your connection or try again shortly.')
   }
   if (res.status === 401 && auth) window.dispatchEvent(new Event('cx-unauthorized'))
   const data = res.status === 204 ? null : await res.json().catch(() => null)
@@ -37,7 +37,25 @@ const q = (o) => { const p = new URLSearchParams(Object.entries(o).filter(([, v]
 
 export const api = {
   health: () => request('/health', { auth: false }),
-  login: (username, password) => request('/auth/local-login', { method: 'POST', body: { username, password }, auth: false }),
+  login: (email, password, remember = false) => request('/auth/login', { method: 'POST', body: { email, password, remember }, auth: false }),
+  requestAccess: (b) => request('/auth/request-access', { method: 'POST', body: b, auth: false }),
+  forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: { email }, auth: false }),
+  resetPassword: (token, new_password) => request('/auth/reset-password', { method: 'POST', body: { token, new_password }, auth: false }),
+  changePassword: (current_password, new_password) => request('/auth/change-password', { method: 'POST', body: { current_password, new_password } }),
+  decideAccount: (email, action, role) => request(`/admin/accounts/${encodeURIComponent(email)}/decision`, { method: 'POST', body: { action, role } }),
+  priority: () => request('/admin/priority-order'),
+  setPriority: (order) => request('/admin/priority-order', { method: 'PUT', body: { order } }),
+  manualBooking: (b) => request('/bookings/manual', { method: 'POST', body: b }),
+  explain: (id) => request(`/timetable/explain/${id}`),
+  assistantDraft: (text, choices) => request('/assistant/schedule-request', { method: 'POST', body: { text, choices } }),
+  assistantSubmit: (text, choices) => request('/assistant/submit', { method: 'POST', body: { text, choices } }),
+  scheduleRequest: (text) => request('/assistant/schedule-request', { method: 'POST', body: { text } }),
+  dataList: (e) => request(`/admin/data/${e}`),
+  dataCreate: (e, b) => request(`/admin/data/${e}`, { method: 'POST', body: b }),
+  dataUpdate: (e, id, b) => request(`/admin/data/${e}/${encodeURIComponent(id)}`, { method: 'PUT', body: b }),
+  dataDelete: (e, id) => request(`/admin/data/${e}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  dataExport: () => request('/admin/export/dataset'),
+  dataImport: (b) => request('/admin/import/dataset', { method: 'POST', body: b }),
   me: () => request('/auth/me'),
   datasetStatus: () => request('/dataset/status', { auth: false }),
   datasetSummary: () => request('/dataset/summary'),
@@ -53,6 +71,7 @@ export const api = {
   venues: () => request('/venues'),
   events: () => request('/events'),
   exams: () => request('/exams'),
+  publishExams: (withdraw = false) => request('/exams/publish', { method: 'POST', body: { withdraw } }),
   generateExams: () => request('/exams/generate', { method: 'POST' }),
   bookings: () => request('/bookings'),
   booking: (id) => request(`/bookings/${id}`),
@@ -65,6 +84,7 @@ export const api = {
   sampleDisruption: () => request('/disruptions/sample'),
   previewDisruption: (changes, time_limit_s = 90) => request('/disruptions/preview', { method: 'POST', body: { changes, time_limit_s } }),
   disruptionComparison: (id) => request(`/disruptions/${id}/comparison`),
+  rejectDisruption: (id, reason) => request(`/disruptions/${id}/reject`, { method: 'POST', body: { reason } }),
   applyDisruption: (id) => request(`/disruptions/apply${q({ did: id })}`, { method: 'POST' }),
   notifications: () => request('/notifications'),
   markRead: (ids) => request('/notifications/read', { method: 'POST', body: { ids } }),

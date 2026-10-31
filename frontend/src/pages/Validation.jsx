@@ -13,7 +13,7 @@ export default function Validation() {
   const [open, setOpen] = useState(null)
   return (
     <>
-      <PageHeader title="Validation Reports" subtitle="Live output of the organisers' official validator, run as a separate process on the current schedule. Nothing is summarised away."
+      <PageHeader title="Validation" subtitle="Live result from the official validator for the current schedule."
         actions={<Btn onClick={st.reload} loading={st.loading}>Re-run validator</Btn>} />
       <Async state={st} rows={3}>{(d) => (
         <div className="grid gap-5">

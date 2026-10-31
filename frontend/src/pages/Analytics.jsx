@@ -12,7 +12,7 @@ export default function Analytics() {
   const u = useApi(api.utilisation, [])
   return (
     <>
-      <PageHeader title="Room Utilisation & Analytics" subtitle="Every figure is computed from the generated timetable, exam schedule and booking decisions. No demo or estimated data." />
+      <PageHeader title="Room Usage" subtitle="Figures come from the current timetable, exams and bookings." />
       <Async state={a} rows={3}>{(d) => (
         <div className="grid gap-5 lg:grid-cols-2">
           <Chart title="Room utilisation (teaching hours)" note="Share of available teaching periods used per room. Rooms with closures have fewer available periods.">

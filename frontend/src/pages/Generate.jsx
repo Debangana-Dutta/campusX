@@ -9,7 +9,7 @@ import { download, titleCase } from '../utils/format'
 function Step({ n, title, done, children }) {
   return (
     <Card>
-      <div className="mb-3 flex items-center gap-3"><span className={`grid h-9 w-9 place-items-center rounded-2xl font-extrabold text-navy ${done ? 'bg-mint/80' : 'bg-peri/60'}`}>{done ? <CheckCircle2 className="h-5 w-5" /> : n}</span>
+      <div className="mb-3 flex items-center gap-3"><span className={`grid h-9 w-9 place-items-center rounded-2xl font-extrabold text-navy ${done ? 'tone-ok' : 'tone-info'}`}>{done ? <CheckCircle2 className="h-5 w-5" /> : n}</span>
         <h2 className="text-lg font-extrabold text-navy">{title}</h2></div>{children}
     </Card>
   )
@@ -38,7 +38,7 @@ export default function Generate() {
 
   return (
     <>
-      <PageHeader title="Generate Timetable" subtitle="Runs the real OR-Tools solver on the backend, then the official validator. The request stays open until the solver finishes or reaches its time limit; no progress is simulated." />
+      <PageHeader title="Timetable Generator" subtitle="Runs the constraint solver, then the official validator. The page waits until the solver finishes or reaches its time limit." />
       <div className="grid gap-5 xl:grid-cols-2">
         <Step n={1} title="Dataset readiness" done={status.data?.integrity?.ok}>
           <Async state={status} rows={1}>{(d) => (
@@ -60,7 +60,7 @@ export default function Generate() {
         <Step n={3} title="Run solver and validator" done={!!r}>
           <Btn variant="primary" onClick={start} loading={run.busy} className="w-full sm:w-auto"><Play className="h-4 w-4" />Generate with solver</Btn>
           {run.busy && <p className="mt-3 text-sm text-muted" role="status">Solver running on the server&hellip; {run.elapsed}s elapsed (limit {opt.time_limit_s}s). Please keep this tab open.</p>}
-          {run.error && <div role="alert" className="clay-inset mt-3 p-4 text-sm"><p className="font-extrabold text-bad">Generation failed</p><p className="mt-1 text-ink">{run.error.message}</p>
+          {run.error && <div role="alert" className="clay-inset mt-3 p-4 text-sm"><p className="font-extrabold text-danger">Generation failed</p><p className="mt-1 text-ink">{run.error.message}</p>
             {run.error.detail && <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap text-xs text-muted">{JSON.stringify(run.error.detail, null, 2)}</pre>}</div>}
         </Step>
         <Step n={4} title="Results" done={r?.accepted}>

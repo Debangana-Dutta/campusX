@@ -16,6 +16,14 @@ export default function Availability() {
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [res, setRes] = useState(null)
+  const [say, setSay] = useState('')
+  const [draft, setDraft] = useState(null)
+  const describe = async () => {
+    try {
+      const r = await api.scheduleRequest(say); setDraft(r)
+      if (r.draft) { setDays(r.draft.days); setFrom(r.draft.periods[0]); setTo(r.draft.periods.at(-1)); setReason(r.draft.reason) }
+    } catch (x) { toast(x.message, 'error') }
+  }
   const submit = async (e) => {
     e.preventDefault()
     if (!days.length) return toast('Pick at least one day', 'error')
@@ -28,9 +36,13 @@ export default function Availability() {
   }
   return (
     <>
-      <PageHeader title="Availability" subtitle="Mark when you are unavailable. The system computes the smallest set of timetable moves and sends it to the admin office. You cannot approve your own request." />
+      <PageHeader title="Availability" subtitle="Mark when you are unavailable. The admin office reviews the proposed timetable changes." />
       <div className="grid gap-5 lg:grid-cols-2">
         <Card as="form" onSubmit={submit} className="grid gap-4" aria-label="Mark unavailability">
+          <div><label htmlFor="say" className="label">Describe it (optional)</label>
+            <div className="flex gap-2"><input id="say" className="field" placeholder="e.g. I can't teach Monday morning" value={say} onChange={(e) => setSay(e.target.value)} /><Btn type="button" onClick={describe} disabled={say.trim().length < 5}>Fill form</Btn></div>
+            {draft?.follow_up?.length > 0 && <ul className="mt-2 list-disc pl-5 text-sm text-ink">{draft.follow_up.map((q) => <li key={q}>{q}</li>)}</ul>}
+            {draft?.draft && <p className="mt-2 text-xs text-muted">Filled in below. Check it, then send. {draft.note}</p>}</div>
           <fieldset><legend className="label">Days</legend><div className="flex flex-wrap gap-2">{DAYS.map((d) => <button type="button" key={d} aria-pressed={days.includes(d)} onClick={() => setDays((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d])} className={`pill ${days.includes(d) ? 'bg-lavender/80 text-navy' : 'bg-surface text-muted'}`}>{DAY_NAMES[d]}</button>)}</div></fieldset>
           <div className="grid grid-cols-2 gap-3">{[['From period', from, setFrom, 'f'], ['To period', to, setTo, 't']].map(([l, v, s, id]) => <Field key={id} label={l} id={id}><select id={id} className="field" value={v} onChange={(e) => s(+e.target.value)}>{Object.entries(PERIOD_TIME).filter(([p]) => +p <= 9).map(([p, t]) => <option key={p} value={p}>P{p} ({t})</option>)}</select></Field>)}</div>
           <Field label="Reason" id="r"><input id="r" className="field" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Conference" /></Field>

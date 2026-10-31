@@ -1,109 +1,107 @@
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { ArrowRight, Bot, Building2, CalendarX2, GraduationCap, Moon, ShieldCheck, Sparkles, Sun, Wand2 } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { ArrowRight, Bell, CalendarClock, CalendarDays, CalendarX2, CheckCircle2, ClipboardCheck, GraduationCap, Moon, ShieldCheck, Sun } from 'lucide-react'
 import { Logo } from '../components/Logo'
-import { useTheme } from '../contexts/AppContexts'
+import { useAuth, useTheme } from '../contexts/AppContexts'
 
-const features = [
-  { icon: Wand2, title: 'Constraint-based timetables', text: 'OR-Tools CP-SAT places every session in a day, period and room. Hard constraints are never traded for a better score.', tone: 'bg-lavender/70' },
-  { icon: ShieldCheck, title: 'Checked by the official validator', text: 'Every schedule is run through the organisers\u2019 validator before it can be approved or exported.', tone: 'bg-mint/70' },
-  { icon: Building2, title: 'Transparent venue decisions', text: 'Spectra week bookings follow the published priority order, with a reason for every approval, alternative and rejection.', tone: 'bg-peach/70' },
-  { icon: CalendarX2, title: 'Minimum-disruption changes', text: 'Faculty leave or a closed room? Preview exactly which sessions move, then approve. Nothing applies automatically.', tone: 'bg-peri/70' },
-  { icon: GraduationCap, title: 'Exam scheduling', text: 'Midsems are allocated across rooms at half capacity, without group or room clashes.', tone: 'bg-sky/70' },
-  { icon: Bot, title: 'Campus Buddy', text: 'Ask in English or Hinglish. Answers come from your real timetable; AI never decides validity.', tone: 'bg-rose/70' },
+const FEATURES = [
+  { icon: CalendarDays, title: 'Intelligent timetable scheduling', text: 'Every lecture, tutorial and lab placed in a day, period and room, with every hard rule respected.' },
+  { icon: ClipboardCheck, title: 'Venue booking', text: 'Request a room in plain English or Hinglish. See a clear decision and the reason behind it.' },
+  { icon: GraduationCap, title: 'Examination planning', text: 'Midsems scheduled across rooms at half capacity, then published to students when ready.' },
+  { icon: ShieldCheck, title: 'Clash detection', text: 'Every schedule is verified by the official validator before it can be approved.' },
+  { icon: CalendarX2, title: 'Disruption management', text: 'Leave or a closed room? Review exactly which sessions move before an admin applies anything.' },
+  { icon: Bell, title: 'Notifications', text: 'The right people hear about approvals, changes and announcements, and no one else.' },
 ]
-const steps = [['Load', 'Import the CIT dataset and verify its integrity.'], ['Solve', 'Generate a clash-free timetable, exams and bookings.'], ['Validate', 'The official validator must report zero hard violations.'], ['Adapt', 'Preview changes, review the diff, then approve and apply.']]
+const STEPS = [
+  ['Load the data', 'Import the campus dataset. Every record is checked before it is used.'],
+  ['Generate and verify', 'The solver builds the timetable and exams; the validator confirms there are no clashes.'],
+  ['Book and adjust', 'Rooms are requested and decided by fixed priority rules. Changes are proposed, reviewed and approved.'],
+]
 
-function Preview() {
-  // Illustrative only: a structural mock of the timetable grid with no real numbers or claims.
-  const cols = ['bg-lavender/70', 'bg-mint/70', 'bg-peach/70', 'bg-peri/70', 'bg-sky/70']
+function Preview({ reduce }) {
+  // Illustrative only: structure of the real timetable view, with no figures or claims.
+  const tint = ['cc-0', 'cc-1', 'cc-2', 'cc-3', 'cc-4', 'cc-6']
+  const filled = new Set([0, 3, 4, 7, 9, 12, 14, 16, 19])
+  const float = (d) => (reduce ? {} : { animate: { y: [0, -6, 0] }, transition: { duration: 6 + d, repeat: Infinity, ease: 'easeInOut' } })
   return (
-    <div className="clay relative mx-auto w-full max-w-3xl p-4 sm:p-6" aria-label="Illustrative preview of the timetable view">
-      <div className="mb-3 flex items-center justify-between"><span className="pill bg-surface text-muted">Illustrative preview</span><span className="pill bg-mint/70 text-[#14513f]">Validated</span></div>
-      <div className="grid grid-cols-5 gap-2 sm:gap-3">
-        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((d) => <div key={d} className="text-center text-xs font-bold text-muted">{d}</div>)}
-        {Array.from({ length: 20 }, (_, i) => {
-          const on = [0, 3, 6, 7, 9, 11, 12, 14, 16, 18].includes(i)
-          return <div key={i} className={`h-9 rounded-xl sm:h-12 ${on ? `${cols[i % 5]} shadow-[inset_2px_2px_4px_rgba(255,255,255,.7),inset_-2px_-2px_5px_rgba(0,0,0,.07)]` : 'clay-inset'}`} />
-        })}
+    <div className="relative mx-auto w-full max-w-xl" aria-label="Illustrative preview of the OptiCampus timetable">
+      <div className="glass overflow-hidden rounded-3xl p-4 sm:p-5">
+        <div className="mb-3 flex items-center justify-between"><span className="tone-neutral rounded-full px-2.5 py-1 text-[11px] font-semibold">Illustrative preview</span><span className="tone-ok inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"><CheckCircle2 className="h-3.5 w-3.5" />Verified</span></div>
+        <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((d) => <div key={d} className="text-center text-[11px] font-semibold text-muted">{d}</div>)}
+          {Array.from({ length: 25 }, (_, i) => <div key={i} className={`h-8 rounded-lg sm:h-10 ${filled.has(i) ? `${tint[i % 6]} shadow-[inset_1px_1px_3px_rgba(255,255,255,.5)]` : 'clay-inset'}`} />)}
+        </div>
       </div>
+      <motion.div {...float(0)} className="clay-sm absolute -left-3 -top-5 hidden items-center gap-2 px-3.5 py-2.5 sm:flex"><span className="tone-ok grid h-8 w-8 place-items-center rounded-xl"><CheckCircle2 className="h-4 w-4" /></span><span className="text-sm font-semibold text-navy">No clashes</span></motion.div>
+      <motion.div {...float(1.5)} className="clay-sm absolute -bottom-5 -right-3 hidden items-center gap-2 px-3.5 py-2.5 sm:flex"><span className="tone-lav grid h-8 w-8 place-items-center rounded-xl"><CalendarClock className="h-4 w-4" /></span><span className="text-sm font-semibold text-navy">Room free</span></motion.div>
     </div>
   )
 }
 
 export default function Landing() {
   const { dark, toggle } = useTheme()
+  const { user } = useAuth()
+  const reduce = useReducedMotion()
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
-      <header className="clay sticky top-3 z-20 mt-3 flex items-center justify-between p-3">
-        <Logo />
-        <nav className="hidden items-center gap-6 text-sm font-bold text-muted md:flex" aria-label="Sections">
-          <a href="#features" className="hover:text-navy">Features</a><a href="#how" className="hover:text-navy">How it works</a><a href="#buddy" className="hover:text-navy">Campus Buddy</a>
-        </nav>
-        <div className="flex items-center gap-2">
-          <button className="btn !p-2.5" onClick={toggle} aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}>{dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}</button>
-          <Link to="/login" className="btn btn-primary">Sign in</Link>
-        </div>
-      </header>
-
-      <section className="py-14 text-center sm:py-20">
-        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .5 }}>
-          <span className="pill bg-lavender/60 text-[#2f2670] dark:text-lavender"><Sparkles className="h-3.5 w-3.5" />Campus scheduling, validated</span>
-          <h1 className="mx-auto mt-5 max-w-3xl text-4xl font-extrabold leading-tight tracking-tight text-navy sm:text-6xl">One Campus. <span className="text-accent">Zero Clashes.</span></h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base text-muted sm:text-lg">Meet the smarter way to manage academic timetables, campus venues, examinations and unexpected schedule changes.</p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <a href="#features" className="btn btn-primary !px-6">Explore Campus X<ArrowRight className="h-4 w-4" /></a>
-            <Link to="/login" className="btn !px-6">Sign In</Link>
+    <div className="relative overflow-hidden">
+      {/* soft ambient shapes (CSS only) */}
+      <div aria-hidden className="pointer-events-none absolute -left-24 top-24 h-72 w-72 rounded-full bg-lavender/40 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -right-24 top-64 h-72 w-72 rounded-full bg-sky/40 blur-3xl" />
+      <div className="relative mx-auto max-w-6xl px-4 pb-10 sm:px-6">
+        <header className="glass sticky top-3 z-30 mt-3 flex items-center justify-between rounded-2xl p-2.5 pl-3">
+          <Link to="/" aria-label="OptiCampus home"><Logo size={40} /></Link>
+          <nav aria-label="Sections" className="hidden items-center gap-6 text-sm font-semibold text-muted md:flex">
+            <a href="#features" className="hover:text-navy">Features</a><a href="#how" className="hover:text-navy">How it works</a>
+          </nav>
+          <div className="flex items-center gap-2">
+            <button className="btn !p-2.5" onClick={toggle} aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}>{dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}</button>
+            {user ? <Link to="/app" className="btn btn-primary">Open dashboard</Link> : <><Link to="/login" className="btn hidden sm:inline-flex">Sign In</Link><Link to="/request-access" className="btn btn-primary">Get Started</Link></>}
           </div>
-        </motion.div>
-        <div className="mt-12"><Preview /></div>
-      </section>
+        </header>
 
-      <section id="features" className="scroll-mt-24 py-10">
-        <h2 className="text-center text-3xl font-extrabold text-navy">What Campus X does</h2>
-        <p className="mx-auto mt-2 max-w-xl text-center text-muted">Capabilities of the product as built.</p>
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((f) => (
-            <motion.article key={f.title} whileHover={{ y: -4 }} className="clay p-6">
-              <div className={`mb-4 grid h-12 w-12 place-items-center rounded-2xl ${f.tone} text-navy`}><f.icon className="h-6 w-6" /></div>
-              <h3 className="text-lg font-extrabold text-navy">{f.title}</h3><p className="mt-1.5 text-sm text-muted">{f.text}</p>
-            </motion.article>
-          ))}
-        </div>
-      </section>
+        <section className="grid items-center gap-12 py-14 sm:py-20 lg:grid-cols-2">
+          <motion.div initial={reduce ? false : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .5 }}>
+            <h1 className="text-4xl font-bold leading-[1.1] tracking-tight text-navy sm:text-5xl lg:text-6xl">Make Every Campus Hour <span className="text-accent">Count.</span></h1>
+            <p className="mt-5 max-w-md text-lg leading-relaxed text-muted">Smarter scheduling, seamless venue management and clash-free campus operations.</p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link to={user ? '/app' : '/request-access'} className="btn btn-primary !px-6">Get Started<ArrowRight className="h-4 w-4" /></Link>
+              <a href="#features" className="btn !px-6">Explore Platform</a>
+            </div>
+            {!user && <p className="mt-4 text-sm text-muted">Already have an account? <Link to="/login" className="font-semibold text-accent">Sign In</Link></p>}
+          </motion.div>
+          <Preview reduce={reduce} />
+        </section>
 
-      <section id="how" className="scroll-mt-24 py-10">
-        <h2 className="text-center text-3xl font-extrabold text-navy">How it works</h2>
-        <ol className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {steps.map(([t, d], i) => (
-            <li key={t} className="clay p-6"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-peri/70 font-extrabold text-navy">{i + 1}</span>
-              <h3 className="mt-3 text-lg font-extrabold text-navy">{t}</h3><p className="mt-1 text-sm text-muted">{d}</p></li>
-          ))}
-        </ol>
-      </section>
-
-      <section id="buddy" className="scroll-mt-24 py-10">
-        <div className="clay grid items-center gap-8 p-6 sm:p-10 md:grid-cols-2">
-          <div>
-            <span className="pill bg-rose/70 text-[#7a1f3a]"><Bot className="h-3.5 w-3.5" />Campus Buddy</span>
-            <h2 className="mt-3 text-3xl font-extrabold text-navy">AI that assists. Code that decides.</h2>
-            <p className="mt-3 text-muted">The assistant reads requests and explains your timetable in English or Hinglish. Every booking and schedule is still decided and validated by deterministic code, and the manual forms keep working if the AI is unavailable.</p>
+        <section id="features" aria-labelledby="f-h" className="scroll-mt-24 py-12">
+          <h2 id="f-h" className="text-3xl font-bold tracking-tight text-navy">Everything the campus schedule needs</h2>
+          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map((f) => (
+              <article key={f.title} className="clay lift p-6"><span className="tone-lav mb-4 grid h-11 w-11 place-items-center rounded-2xl"><f.icon className="h-5 w-5" /></span>
+                <h3 className="text-lg font-bold text-navy">{f.title}</h3><p className="mt-1.5 text-sm leading-relaxed text-muted">{f.text}</p></article>))}
           </div>
-          <div className="clay-inset space-y-3 p-5 text-sm">
-            <p className="ml-auto w-fit max-w-[85%] rounded-2xl bg-lavender/60 px-4 py-2.5 font-semibold text-navy">Aaj meri next class kaha hai?</p>
-            <p className="w-fit max-w-[85%] rounded-2xl bg-surface px-4 py-2.5 text-ink">Answers are built from the signed-in user\u2019s own timetable data.</p>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="py-10 text-center">
-        <div className="clay mx-auto max-w-3xl p-8 sm:p-12">
-          <h2 className="text-3xl font-extrabold text-navy">Ready to see it work?</h2>
-          <p className="mt-2 text-muted">Sign in with a demo account for each role.</p>
-          <Link to="/login" className="btn btn-primary mt-6 !px-8">Sign In<ArrowRight className="h-4 w-4" /></Link>
-        </div>
-      </section>
-      <footer className="flex flex-wrap items-center justify-between gap-3 pt-6 text-sm text-muted"><Logo size={28} /><p>Campus X &middot; One Campus. Zero Clashes. Smarter Decisions.</p></footer>
+        <section id="how" aria-labelledby="h-h" className="scroll-mt-24 py-12">
+          <h2 id="h-h" className="text-3xl font-bold tracking-tight text-navy">How it works</h2>
+          <ol className="mt-8 grid gap-5 md:grid-cols-3">
+            {STEPS.map(([t, d], i) => (<li key={t} className="clay-sm lift p-6"><span className="tone-info grid h-9 w-9 place-items-center rounded-xl font-bold">{i + 1}</span><h3 className="mt-3 text-lg font-bold text-navy">{t}</h3><p className="mt-1 text-sm leading-relaxed text-muted">{d}</p></li>))}
+          </ol>
+        </section>
+
+        <section className="py-12">
+          <div className="clay mx-auto max-w-3xl p-8 text-center sm:p-12">
+            <h2 className="text-3xl font-bold tracking-tight text-navy">Ready to give your campus its hours back?</h2>
+            <p className="mx-auto mt-2 max-w-md text-muted">Request access, or sign in if you already have an account.</p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3"><Link to="/request-access" className="btn btn-primary !px-7">Get Started<ArrowRight className="h-4 w-4" /></Link><Link to="/login" className="btn !px-7">Sign In</Link></div>
+          </div>
+        </section>
+
+        <footer className="mt-10 border-t border-[rgb(var(--peri)/.4)] pt-8 text-center">
+          <div className="mb-4 flex justify-center"><Logo size={36} /></div>
+          <p className="mx-auto max-w-md text-sm text-muted">Designed to make campus operations smarter, simpler and more connected.</p>
+          <p className="mt-3 text-sm text-muted">© 2026 OptiCampus. All rights reserved.</p>
+        </footer>
+      </div>
     </div>
   )
 }

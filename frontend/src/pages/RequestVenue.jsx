@@ -61,10 +61,10 @@ export default function RequestVenue() {
   const P = Object.entries(PERIOD_TIME)
   return (
     <>
-      <PageHeader title={user.role === 'department_coordinator' ? 'Book a Room' : 'Request a Venue'} subtitle="Describe the event in your own words, review what was understood, edit anything, then submit. The booking engine (not AI) makes the decision." />
+      <PageHeader title={user.role === 'department_coordinator' ? 'Book a Room' : 'Request a Venue'} subtitle="Describe the event in English or Hinglish, check the details, then submit. A fixed set of rules makes the decision." />
       <div className="grid gap-5 xl:grid-cols-5">
         <Card className="xl:col-span-2">
-          <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-navy"><Languages className="h-5 w-5 text-accent" />1. Tell us what you need</h2>
+          <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-navy"><Languages className="h-5 w-5 text-accent" />1. Describe your request</h2>
           <label htmlFor="nl" className="label">Your request (English or Hinglish)</label>
           <textarea id="nl" rows={5} className="field" value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Seminar hall kal shaam 6 baje, 2 ghante, 100 log, mic chahiye" />
           <div className="mt-3 flex flex-wrap gap-2">{SAMPLES.map((s) => <button key={s} onClick={() => setText(s)} className="pill bg-surface text-left text-muted hover:text-navy">{s.length > 38 ? `${s.slice(0, 38)}...` : s}</button>)}</div>
@@ -75,26 +75,26 @@ export default function RequestVenue() {
               {parse.ai_error && !parse.ai_used && <p className="text-xs text-muted">{parse.ai_error}.</p>}
               {parse.follow_up?.length > 0 && <div className="clay-inset p-3"><p className="mb-1 font-extrabold text-navy">I need a bit more information:</p><ul className="list-disc pl-5 text-ink">{parse.follow_up.map((q) => <li key={q}>{q}</li>)}</ul></div>}
               {parse.assumptions?.length > 0 && <div className="clay-inset p-3"><p className="mb-1 font-extrabold text-navy">Please confirm my assumptions:</p><ul className="list-disc pl-5 text-ink">{parse.assumptions.map((q) => <li key={q}>{q}</li>)}</ul></div>}
-              {parse.warnings?.map((w) => <p key={w} className="flex gap-2 rounded-xl bg-peach/50 p-3 font-semibold text-[#6b3a14] dark:text-peach"><AlertTriangle className="h-4 w-4 shrink-0" />{w}</p>)}
+              {parse.warnings?.map((w) => <p key={w} className="flex gap-2 rounded-xl tone-warn p-3 font-semibold"><AlertTriangle className="h-4 w-4 shrink-0" />{w}</p>)}
             </div>)}
           <p className="mt-4 text-xs text-muted">No AI available? The form on the right always works on its own.</p>
         </Card>
 
         <Card as="form" onSubmit={submit} noValidate className="grid gap-4 xl:col-span-3" aria-label="Booking details">
           <h2 className="text-lg font-extrabold text-navy">2. Review and edit, then submit</h2>
-          <Field label="Event title" id="t"><input id="t" className="field" value={f.title} onChange={(e) => set('title', e.target.value)} aria-invalid={!!errs.title} />{errs.title && <p className="mt-1 text-xs font-bold text-bad">{errs.title}</p>}</Field>
+          <Field label="Event title" id="t"><input id="t" className="field" value={f.title} onChange={(e) => set('title', e.target.value)} aria-invalid={!!errs.title} />{errs.title && <p className="mt-1 text-xs font-bold text-danger">{errs.title}</p>}</Field>
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Attendance" id="a"><input id="a" type="number" min="1" className="field" value={f.attendance} onChange={(e) => set('attendance', e.target.value)} />{errs.attendance && <p className="mt-1 text-xs font-bold text-bad">{errs.attendance}</p>}</Field>
-            <Field label="Duration (hours)" id="d"><input id="d" type="number" min="1" max="13" className="field" value={f.duration_periods} onChange={(e) => set('duration_periods', e.target.value)} />{errs.duration && <p className="mt-1 text-xs font-bold text-bad">{errs.duration}</p>}</Field>
+            <Field label="Attendance" id="a"><input id="a" type="number" min="1" className="field" value={f.attendance} onChange={(e) => set('attendance', e.target.value)} />{errs.attendance && <p className="mt-1 text-xs font-bold text-danger">{errs.attendance}</p>}</Field>
+            <Field label="Duration (hours)" id="d"><input id="d" type="number" min="1" max="13" className="field" value={f.duration_periods} onChange={(e) => set('duration_periods', e.target.value)} />{errs.duration && <p className="mt-1 text-xs font-bold text-danger">{errs.duration}</p>}</Field>
             <Field label="Category" id="c" hint={`Your role caps this at ${titleCase(cats[0])}.`}><select id="c" className="field" value={f.requested_category} onChange={(e) => set('requested_category', e.target.value)}>{cats.map((c) => <option key={c} value={c}>{titleCase(c)}</option>)}</select></Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Day" id="day"><select id="day" className="field" value={f.day} onChange={(e) => set('day', e.target.value)}>{DAYS.map((d) => <option key={d} value={d}>{DAY_NAMES[d]}</option>)}</select></Field>
             <Field label="Window starts" id="f"><select id="f" className="field" value={f.from_period} onChange={(e) => set('from_period', +e.target.value)}>{P.map(([p, t]) => <option key={p} value={p}>P{p} ({t})</option>)}</select></Field>
-            <Field label="Window ends (period)" id="to"><select id="to" className="field" value={f.to_period} onChange={(e) => set('to_period', +e.target.value)}>{P.map(([p, t]) => <option key={p} value={p}>P{p} (ends {String(+t.slice(0, 2) + 1).padStart(2, '0')}:00)</option>)}</select>{errs.window && <p className="mt-1 text-xs font-bold text-bad">{errs.window}</p>}</Field>
+            <Field label="Window ends (period)" id="to"><select id="to" className="field" value={f.to_period} onChange={(e) => set('to_period', +e.target.value)}>{P.map(([p, t]) => <option key={p} value={p}>P{p} (ends {String(+t.slice(0, 2) + 1).padStart(2, '0')}:00)</option>)}</select>{errs.window && <p className="mt-1 text-xs font-bold text-danger">{errs.window}</p>}</Field>
           </div>
-          <fieldset><legend className="label">Venue types</legend><div className="flex flex-wrap gap-2">{TYPES.map((t) => <button type="button" key={t} aria-pressed={f.room_types.includes(t)} onClick={() => tog('room_types', t)} className={`pill ${f.room_types.includes(t) ? 'bg-lavender/80 text-navy' : 'bg-surface text-muted'}`}>{titleCase(t)}</button>)}</div>{errs.types && <p className="mt-1 text-xs font-bold text-bad">{errs.types}</p>}</fieldset>
-          <fieldset><legend className="label">Required features</legend><div className="flex flex-wrap gap-2">{NEEDS.map((t) => <button type="button" key={t} aria-pressed={f.needs.includes(t)} onClick={() => tog('needs', t)} className={`pill ${f.needs.includes(t) ? 'bg-mint/80 text-[#14513f]' : 'bg-surface text-muted'}`}>{titleCase(t)}</button>)}</div></fieldset>
+          <fieldset><legend className="label">Venue types</legend><div className="flex flex-wrap gap-2">{TYPES.map((t) => <button type="button" key={t} aria-pressed={f.room_types.includes(t)} onClick={() => tog('room_types', t)} className={`pill ${f.room_types.includes(t) ? 'bg-lavender/80 text-navy' : 'bg-surface text-muted'}`}>{titleCase(t)}</button>)}</div>{errs.types && <p className="mt-1 text-xs font-bold text-danger">{errs.types}</p>}</fieldset>
+          <fieldset><legend className="label">Required features</legend><div className="flex flex-wrap gap-2">{NEEDS.map((t) => <button type="button" key={t} aria-pressed={f.needs.includes(t)} onClick={() => tog('needs', t)} className={`pill ${f.needs.includes(t) ? 'tone-ok' : 'bg-surface text-muted'}`}>{titleCase(t)}</button>)}</div></fieldset>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Preferred room (optional)" id="rr" hint="Only a wish: the engine may suggest another room that meets your needs."><input id="rr" className="field" value={f.requested_room} onChange={(e) => set('requested_room', e.target.value.toUpperCase())} placeholder="e.g. SH-1" /></Field>
             <Field label="Mandatory student groups (optional)" id="mg" hint="Comma separated, e.g. CSE-3"><input id="mg" className="field" value={f.mandatory_for_groups} onChange={(e) => set('mandatory_for_groups', e.target.value.toUpperCase())} /></Field>
