@@ -34,6 +34,9 @@ class AppState:
         self.last_validation: dict[str, Any] | None = None
         self.applied_disruptions: list[dict[str, Any]] = []
         self.imported = False
+        self.approved = False
+        self.approved_by: str | None = None
+        self.source = "none"   # none | generated | loaded_export
 
     # ---- dataset
     @property
@@ -72,7 +75,8 @@ class AppState:
                 "overrides": self.outcome.session_overrides if self.outcome else None,
                 "solver_info": self.solver_info, "applied_disruptions": self.applied_disruptions,
                 "live_raw": self.live_raw if self.applied_disruptions else None,
-                "last_validation": self.last_validation}
+                "last_validation": self.last_validation, "approved": self.approved,
+                "approved_by": self.approved_by, "source": self.source}
         self._file.write_text(json.dumps(data))
 
     def _restore_if_any(self, reset: bool) -> None:
@@ -89,6 +93,7 @@ class AppState:
             self.solver_info = d.get("solver_info") or {}
             self.applied_disruptions = d.get("applied_disruptions") or []
             self.last_validation = d.get("last_validation")
+            self.approved, self.approved_by, self.source = d.get("approved", False), d.get("approved_by"), d.get("source", "none")
             if d.get("live_raw"):
                 self.live_raw = d["live_raw"]
             if d.get("decisions") is not None:
@@ -110,6 +115,37 @@ class AppState:
             self.last_validation = res.summary()
             self.save()
         return res
+
+    def status(self) -> str:
+        """draft | validated | approved | invalid  - 'approved' is only possible after official acceptance."""
+        if not self.assignment:
+            return "none"
+        v = self.last_validation
+        if v is None:
+            return "draft"
+        if not v.get("accepted"):
+            return "invalid"
+        return "approved" if self.approved else "validated"
+
+    def approve(self, who: str) -> None:
+        if not (self.last_validation or {}).get("accepted"):
+            raise ValueError("cannot approve: the official validator has not accepted this schedule")
+        self.approved, self.approved_by = True, who
+        self.save()
+
+    def load_schedule(self, schedule: dict, source: str, approver: str | None = None) -> ValidationResult:
+        """Load a finished schedule (e.g. the app's own validated export). Re-validated before it is trusted."""
+        with LOCK:
+            ds = self.ds
+            self.assignment = from_schedule(schedule)
+            self.exams = schedule.get("exams")
+            self.outcome = BookingEngine(ds, self.assignment).decide()
+            self.source, self.approved, self.approved_by = source, False, None
+            v = self.validate()
+            if v.accepted and approver:
+                self.approve(approver)
+            self.save()
+            return v
 
     # ---- generation
     def generate(self, *, seed: int, time_limit_s: int, include_exams: bool = True, include_bookings: bool = True,
@@ -133,6 +169,7 @@ class AppState:
                 self.solver_info = info
                 return {"ok": False, **info}
             self.assignment = res.assignment
+            self.approved, self.approved_by, self.source = False, None, "generated"
             if include_exams:
                 ex = schedule_exams(ds, seed=seed, time_limit_s=30)
                 if not ex.has_solution:
@@ -145,6 +182,10 @@ class AppState:
             self.solver_info = info
             v = self.validate()
             self.save()
+            from app.models.db import record_version
+            sm = v.summary()
+            record_version("generated", res.status, v.accepted, sm["hard_violation_count"], sm["soft_total"],
+                           self.schedule(), exam_status=info.get("exam_status"))
             return {"ok": True, "validation": v.summary(), **info, "accepted": v.accepted}
 
 

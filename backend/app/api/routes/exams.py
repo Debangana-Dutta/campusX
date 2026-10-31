@@ -15,10 +15,11 @@ def list_exams(user: User = Depends(current_user)):
     if not STATE.imported:
         raise HTTPException(409, "dataset not imported yet")
     ds = STATE.ds
-    return {"scheduled": STATE.exams is not None,
-            "exams": [{**e, "size": ds.exams[e["exam_id"]]["size"], "groups": ds.exams[e["exam_id"]]["groups"],
+    allx = [e for e in (STATE.exams or []) if user.role != "student" or user.group_id in ds.exams[e["exam_id"]]["groups"]]
+    return {"scheduled": STATE.exams is not None, "calendar": ds.raw["calendar"]["exam_week"],
+            "exams": [{**e, "title": ", ".join(ds.courses[c]["title"] for c in ds.exams[e["exam_id"]]["course_ids"]), "size": ds.exams[e["exam_id"]]["size"], "groups": ds.exams[e["exam_id"]]["groups"],
                        "seats_at_half_capacity": sum(ds.rooms[r]["capacity"] // 2 for r in e["rooms"])}
-                      for e in (STATE.exams or [])]}
+                      for e in allx]}
 
 
 @router.post("/generate")
@@ -33,4 +34,6 @@ def generate_exams(seed: int = 42, time_limit_s: int = 30, user: User = Depends(
         STATE.validate()
     STATE.save()
     audit.record(user.id, "exams.generate", "exams", {"status": r.status, "penalty": r.penalty})
+    from app.services.audit import notify
+    notify.notify("*", "The exam timetable was regenerated.", "exam", "/app/exams")
     return {"status": r.status, "penalty": r.penalty, "count": len(r.exams), "exams": r.exams}

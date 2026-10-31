@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     demo_password: str = "campusx-demo"
     local_auth_secret: str = "dev-only-secret-change-me"
 
+    # Gemini is called from the backend only. Empty key = deterministic fallbacks are used.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"
+
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:5173"
 

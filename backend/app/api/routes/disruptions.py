@@ -12,7 +12,7 @@ from sqlalchemy import select
 from app.core.auth import User, current_user, require_roles
 from app.models.db import DisruptionRecord, session_scope
 from app.schemas.api import DisruptionIn
-from app.services.audit import log as audit
+from app.services.audit import log as audit, notify
 from app.services.bookings.engine import BookingEngine
 from app.services.dataset.loader import Dataset, apply_disruption
 from app.services.pipeline import apply_change_and_export
@@ -25,6 +25,12 @@ router = APIRouter(prefix="/disruptions")
 
 def _fingerprint() -> str:
     return hashlib.sha256(json.dumps(sorted((k, list(v)) for k, v in STATE.assignment.items())).encode()).hexdigest()[:16]
+
+
+@router.get("/sample")
+def sample(user: User = Depends(require_roles("admin"))):
+    """The official practice change file from the starter pack (for the admin UI's 'load sample' button)."""
+    return json.loads(STATE.st.sample_disruption_path.read_text(encoding="utf-8"))
 
 
 @router.get("")
@@ -76,6 +82,8 @@ def preview(body: DisruptionIn, user: User = Depends(require_roles("admin", "fac
     with session_scope() as s:
         s.add(DisruptionRecord(id=did, changes={"changes": body.changes}, status=status, proposal=proposal, requested_by=user.id))
     audit.record(user.id, "disruption.preview", did, {"feasible": True, "moved": len(rep.moved), "accepted": summ["accepted"]})
+    if user.role != "admin":
+        notify.notify("role:admin", f"{user.name} proposed a change ({did}): {len(rep.moved)} session(s) would move. Review it.", "disruption", "/app/disruptions")
     return {"id": did, "status": status, **{k: v for k, v in proposal.items() if k != "schedule_after"}}
 
 
@@ -114,8 +122,13 @@ def apply(did: str, user: User = Depends(require_roles("admin"))):
         STATE.assignment = from_schedule(after)
         STATE.exams = after.get("exams")
         STATE.outcome = BookingEngine(Dataset(new_raw), STATE.assignment).decide()
-        STATE.applied_disruptions.append({"id": did, "changes": d.changes})
+        STATE.applied_disruptions.append({"id": did, "changes": d.changes, "moved": p["moved"], "added": p["added"], "removed": p["removed"]})
         d.status, d.approved_by = "applied", user.id
         STATE.validate()
+        from app.models.db import record_version
+        record_version("disruption", p["solver_status"], True, 0, STATE.last_validation["soft_total"], STATE.schedule(), user.id)
         audit.record(user.id, "disruption.apply", did, {"moved": p["summary"]["moved"]})
+        notify.notify("*", f"Timetable change applied: {p['summary']['moved']} session(s) moved. Check your timetable.", "timetable", "/app/timetable")
+        if d.requested_by != user.id:
+            notify.notify(d.requested_by, f"Your change request {did} was approved and applied.", "disruption", "/app/disruptions")
         return {"applied": True, "id": did, "validation": STATE.last_validation}
