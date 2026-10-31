@@ -35,6 +35,8 @@ class AppState:
         self.applied_disruptions: list[dict[str, Any]] = []
         self.imported = False
         self.approved = False
+        self.data_modified = False
+        self.exams_published = False
         self.approved_by: str | None = None
         self.source = "none"   # none | generated | loaded_export
 
@@ -60,49 +62,57 @@ class AppState:
                 self.assignment, self.exams, self.outcome = {}, None, None
                 self.applied_disruptions, self.solver_info, self.last_validation = [], {}, None
                 self.imported = True
+                self.data_modified = False
                 self._restore_if_any(reset)
             return rep
 
     # ---- persistence of derived state
-    @property
-    def _file(self) -> Path:
-        return self.st.state_dir / "state.json"
-
     def save(self) -> None:
-        self.st.state_dir.mkdir(parents=True, exist_ok=True)
+        """Persist derived state in the database (survives restarts and redeploys when the DB is PostgreSQL)."""
+        from app.models.db import KeyValue, session_scope
         data = {"assignment": {k: list(v) for k, v in self.assignment.items()}, "exams": self.exams,
                 "decisions": [d.as_dict() for d in self.outcome.decisions] if self.outcome else None,
                 "overrides": self.outcome.session_overrides if self.outcome else None,
                 "solver_info": self.solver_info, "applied_disruptions": self.applied_disruptions,
-                "live_raw": self.live_raw if self.applied_disruptions else None,
+                "live_raw": self.live_raw if (self.applied_disruptions or self.data_modified) else None,
                 "last_validation": self.last_validation, "approved": self.approved,
-                "approved_by": self.approved_by, "source": self.source}
-        self._file.write_text(json.dumps(data))
+                "approved_by": self.approved_by, "source": self.source, "exams_published": self.exams_published}
+        with session_scope() as s:
+            row = s.get(KeyValue, "state")
+            if row:
+                row.value = data
+            else:
+                s.add(KeyValue(key="state", value=data))
 
     def _restore_if_any(self, reset: bool) -> None:
-        if reset:
-            if self._file.exists():
-                self._file.unlink()
-            return
-        if not self._file.exists():
+        from app.models.db import KeyValue, session_scope
+        with session_scope() as s:
+            row = s.get(KeyValue, "state")
+            if reset:
+                if row:
+                    s.delete(row)
+                return
+            d = row.value if row else None
+        if not d:
             return
         try:
-            d = json.loads(self._file.read_text())
             self.assignment = {k: tuple(v) for k, v in (d.get("assignment") or {}).items()}
             self.exams = d.get("exams")
             self.solver_info = d.get("solver_info") or {}
             self.applied_disruptions = d.get("applied_disruptions") or []
             self.last_validation = d.get("last_validation")
             self.approved, self.approved_by, self.source = d.get("approved", False), d.get("approved_by"), d.get("source", "none")
+            self.exams_published = d.get("exams_published", bool(self.exams))      # older saved states: exams were visible
             if d.get("live_raw"):
                 self.live_raw = d["live_raw"]
+                self.data_modified = True
             if d.get("decisions") is not None:
                 decs = [Decision(x["request_id"], x["status"], x["reason"], x["effective_category"], x.get("day"),
                                  x.get("start_period"), x.get("end_period"), x.get("room_id"),
                                  x.get("displaced_sessions", []), x.get("requires_admin_approval", False), x.get("code", ""))
                         for x in d["decisions"]]
                 self.outcome = BookingOutcome(decs, d.get("overrides") or [], dict(self.assignment))
-        except Exception:  # noqa: BLE001  corrupt state file -> start clean rather than crash
+        except Exception:  # noqa: BLE001  corrupt persisted state -> start clean rather than crash
             self.assignment, self.exams, self.outcome = {}, None, None
 
     # ---- schedule assembly / validation
@@ -141,6 +151,7 @@ class AppState:
             self.exams = schedule.get("exams")
             self.outcome = BookingEngine(ds, self.assignment).decide()
             self.source, self.approved, self.approved_by = source, False, None
+            self.exams_published = bool(self.exams)       # a validated export loaded by the system is published; generated exams are not
             v = self.validate()
             if v.accepted and approver:
                 self.approve(approver)
@@ -176,6 +187,7 @@ class AppState:
                     self.solver_info = {**info, "exam_status": ex.status, "exam_diagnosis": ex.diagnosis}
                     return {"ok": False, **self.solver_info}
                 self.exams = ex.exams
+                self.exams_published = False             # new exams are a draft until an admin publishes them
                 info["exam_status"] = ex.status
             if include_bookings:
                 self.outcome = BookingEngine(ds, self.assignment).decide()

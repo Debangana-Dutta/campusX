@@ -12,7 +12,7 @@ import re
 from typing import Any
 
 from app.core.auth import User
-from app.services.ai import gemini
+from app.services.ai import exam_assistant, explain, gemini
 
 IST = dt.timezone(dt.timedelta(hours=5, minutes=30))
 PY_DAY = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
@@ -51,7 +51,9 @@ def _scope_sessions(user: User, ds, assign, group_id=None, faculty_id=None) -> t
 
 def _intent(q: str) -> str:
     t = q.lower()
-    if re.search(r"exam|pariksha|test\b|paper", t):
+    if re.search(r"\bwhy\b|kyun|kyon|reason", t) and not re.search(r"exam|pariksha|mid[\s-]?sem", t):
+        return "why"
+    if re.search(r"mid[\s-]?sem|mid[\s-]?term|exam|pariksha|test\b|paper|\bsem\b", t):
         return "exam"
     if re.search(r"who (is )?teach|kaun pad|teacher|professor|faculty|sir\b|madam", t):
         return "teacher"
@@ -80,7 +82,8 @@ def _target_day(q: str, now: dt.datetime) -> tuple[str, str]:
 
 
 def ask(question: str, user: User, ds, assign: dict, exams: list[dict] | None, applied: list[dict],
-        *, group_id: str | None = None, faculty_id: str | None = None, now: dt.datetime | None = None) -> dict[str, Any]:
+        *, group_id: str | None = None, faculty_id: str | None = None, now: dt.datetime | None = None,
+        exams_published: bool = True) -> dict[str, Any]:
     now = now or now_ist()
     pt = _period_times(ds.raw["calendar"])
     intent = _intent(question)
@@ -89,28 +92,20 @@ def ask(question: str, user: User, ds, assign: dict, exams: list[dict] | None, a
     answer = ""
 
     if intent == "exam":
-        if user.role == "student":
-            mine = [e for e in (exams or []) if user.group_id in ds.exams[e["exam_id"]]["groups"]]
-        elif scope.startswith("group"):
-            g = scope.split()[1]
-            mine = [e for e in (exams or []) if g in ds.exams[e["exam_id"]]["groups"]]
+        r = exam_assistant.answer(question, user, ds, exams, exams_published, group_id=group_id)
+        answer = r["answer"]
+        facts.update(r["facts"])
+    elif intent == "why":
+        m = re.search(r"\b([A-Z]{2,3}\d{3}(?:-[A-Z0-9]+)*)\b", question.upper())
+        pool = [sid for sid in sids if m and (sid == m.group(1) or ds.sessions[sid]["course_id"] == m.group(1).split("-")[0])]
+        if not sids:
+            answer = "I can explain scheduling decisions for your own classes. Ask about a course code, e.g. 'Why is CS201 at 8 AM?'"
+        elif not pool:
+            answer = "Tell me which course (for example CS201) and I'll explain why it is scheduled where it is."
         else:
-            mine = list(exams or []) if user.role in ("admin", "department_coordinator") else []
-        slots = ds.raw["calendar"]["exam_week"]["sessions"]
-        st = {s["id"]: f"{s['start']}-{s['end']}" for s in slots}
-        order = {d: i for i, d in enumerate(ds.raw["calendar"]["exam_week"]["days"])}
-        mine.sort(key=lambda e: (order[e["day"]], e["session"]))
-        facts["exams"] = [{"exam": e["exam_id"], "day": e["day"], "time": st[e["session"]], "rooms": e["rooms"]} for e in mine]
-        if not exams:
-            answer = "The exam timetable has not been generated yet."
-        elif not mine:
-            answer = "I have no exam entries I can show for you."
-        else:
-            first = mine[0]
-            answer = (f"Your next exam: {first['exam_id'].replace('EX-', '')} on {first['day']} {st[first['session']]} "
-                      f"in {', '.join(first['rooms'])}. All {len(mine)} exams: " +
-                      "; ".join(f"{e['exam_id'].replace('EX-', '')} {e['day']} {st[e['session']]}" for e in mine) + ". "
-                      "(Exam week days are weekday names; the calendar has no dates yet.)")
+            ex = explain.explain_session(ds, assign, pool[0], None)
+            facts["explanation"] = ex["facts"]
+            answer = " ".join(ex["facts"])
     elif intent == "teacher":
         m = re.search(r"\b([A-Z]{2,3}\d{3})\b", question.upper())
         cands = [c for c in ds.courses if (m and c == m.group(1))] or \

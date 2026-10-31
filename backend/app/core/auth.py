@@ -25,14 +25,6 @@ STUDENT = "student"   # read-only experience; never an approval role
 DATASET_ROLE = {"admin": "admin", "faculty": "faculty", "department_coordinator": "department_coordinator",
                 "club_representative": "club"}
 
-DEMO_USERS = {
-    "admin": {"role": "admin", "name": "Dean's Office (demo)", "department": None, "faculty_id": None, "org": None},
-    "faculty": {"role": "faculty", "name": "Dr. Ananya Mishra (demo)", "department": "CSE", "faculty_id": "F01", "org": None},
-    "coordinator": {"role": "department_coordinator", "name": "CSE Coordinator (demo)", "department": "CSE", "faculty_id": None, "org": None},
-    "club": {"role": "club_representative", "name": "Dramatics Society (demo)", "department": None, "faculty_id": None, "org": "Dramatics Society"},
-    "student": {"role": "student", "name": "CSE Year 2 student (demo)", "department": "CSE", "faculty_id": None, "org": None, "group_id": "CSE-2"},
-}
-
 
 @dataclass
 class User:
@@ -54,13 +46,14 @@ def _unb64(s: str) -> bytes:
     return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
 
 
-def issue_local_token(username: str, ttl_s: int = 8 * 3600) -> str:
-    body = _b64(json.dumps({"sub": username, "exp": int(time.time()) + ttl_s}).encode())
+def issue_local_token(user_id: str, ttl_s: int = 8 * 3600) -> str:
+    body = _b64(json.dumps({"sub": user_id, "exp": int(time.time()) + ttl_s}).encode())
     sig = _b64(hmac.new(get_settings().local_auth_secret.encode(), body.encode(), hashlib.sha256).digest())
     return f"{body}.{sig}"
 
 
 def _verify_local(token: str) -> User:
+    from app.models.db import User as UserRow, session_scope
     try:
         body, sig = token.split(".")
         good = _b64(hmac.new(get_settings().local_auth_secret.encode(), body.encode(), hashlib.sha256).digest())
@@ -69,10 +62,15 @@ def _verify_local(token: str) -> User:
         claims = json.loads(_unb64(body))
         if claims["exp"] < time.time():
             raise ValueError("expired")
-        u = DEMO_USERS[claims["sub"]]
+        with session_scope() as s:
+            u = s.get(UserRow, claims["sub"])
+            if not u or u.status != "active":
+                raise ValueError("inactive account")
+            return User(u.id, u.role, u.name, u.department, u.faculty_id, u.organisation, "local", u.group_id)
+    except HTTPException:
+        raise
     except Exception as e:  # noqa: BLE001
         raise HTTPException(401, "invalid or expired token") from e
-    return User(claims["sub"], u["role"], u["name"], u["department"], u["faculty_id"], u["org"], "local", u.get("group_id"))
 
 
 def _verify_supabase(token: str) -> User:

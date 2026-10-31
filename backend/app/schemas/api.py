@@ -78,5 +78,44 @@ class GenerateIn(BaseModel):
 
 
 class LoginIn(BaseModel):
-    username: str
+    username: str | None = None      # legacy field name; an email or short demo username
+    email: str | None = None
     password: str
+    remember: bool = False
+
+
+class AccessRequestIn(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: str = Field(max_length=160)
+    password: str = Field(max_length=200)
+    role: str
+    department: str | None = Field(default=None, max_length=40)
+    faculty_id: str | None = Field(default=None, max_length=16)
+    organisation: str | None = Field(default=None, max_length=120)
+
+
+class ForgotIn(BaseModel):
+    email: str = Field(max_length=160)
+
+
+class ResetIn(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
+    new_password: str = Field(max_length=200)
+
+
+class ChangePasswordIn(BaseModel):
+    current_password: str = Field(max_length=200)
+    new_password: str = Field(max_length=200)
+
+
+class ManualBookingIn(BaseModel):
+    title: str = Field(min_length=3, max_length=160)
+    attendance: int = Field(ge=1, le=5000)
+    duration_periods: int = Field(ge=1, le=13)
+    room_id: str = Field(max_length=24)
+    day: Literal["MON", "TUE", "WED", "THU", "FRI"]
+    start_period: int = Field(ge=1, le=13)
+    needs: list[str] = []
+    mandatory_for_groups: list[str] = []
+    requested_category: Literal["institute_event", "guest_lecture", "department_event", "club_event"] = "department_event"
+    department: str | None = None

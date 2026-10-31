@@ -104,11 +104,13 @@ def build_candidates(ds: Dataset, *, enforce_allowed_uses: bool = True,
 # ----------------------------------------------------------------------------- model
 class TimetableModel:
     def __init__(self, ds: Dataset, *, baseline: Assignment | None = None, move_weight: int = 0,
-                 pinned: Assignment | None = None, enforce_allowed_uses: bool = True,
+                 pinned: Assignment | None = None, enforce_allowed_uses: bool = True, time_move_weight: int = 0,
                  family_literals: bool = False, preferred_free: dict | None = None):
         self.ds = ds
         self.baseline = baseline or {}
         self.move_weight = move_weight
+        self.time_move_weight = time_move_weight
+        self.time_moved_terms: list[Any] = []
         self.pinned = pinned or {}
         self.m = cp_model.CpModel()
         self.family_lits: dict[str, Any] = {}
@@ -320,6 +322,14 @@ class TimetableModel:
                 else:
                     m.Add(mv + keep == 1)
                 self.moved_terms.append(mv)
+                if self.time_move_weight:      # secondary: prefer a room-only change over a time-slot change
+                    tkeep = self.T[sid].get((b[0], b[1]))
+                    tm = m.NewBoolVar(f"tmoved_{sid}")
+                    if tkeep is None:
+                        m.Add(tm == 1)
+                    else:
+                        m.Add(tm + tkeep == 1)
+                    self.time_moved_terms.append(tm)
 
     def soft_sum(self):
         return sum(sum(v) if v else 0 for v in self.soft_exprs.values())
@@ -328,6 +338,8 @@ class TimetableModel:
         total = self.soft_sum()
         if self.moved_terms:
             total = total + self.move_weight * sum(self.moved_terms)
+            if self.time_moved_terms:
+                total = total + self.time_move_weight * sum(self.time_moved_terms)
         self.m.Minimize(total)
 
 
@@ -370,7 +382,7 @@ def solve_timetable(ds: Dataset, *, seed: int = 42, time_limit_s: int = 120, wor
                     baseline: Assignment | None = None, move_weight: int = 0,
                     pinned: Assignment | None = None, hint: Assignment | None = None,
                     optimise: bool = True, feasibility_share: float = 0.4,
-                    max_moved: int | None = None, log_progress: bool = False,
+                    max_moved: int | None = None, log_progress: bool = False, time_move_weight: int = 0,
                     enforce_allowed_uses: bool = True) -> SolveResult:
     """Generate (or repair) a timetable.
 
@@ -379,7 +391,7 @@ def solve_timetable(ds: Dataset, *, seed: int = 42, time_limit_s: int = 120, wor
     """
     t0 = time.time()
     model = TimetableModel(ds, baseline=baseline, move_weight=move_weight, pinned=pinned,
-                           enforce_allowed_uses=enforce_allowed_uses)
+                           enforce_allowed_uses=enforce_allowed_uses, time_move_weight=time_move_weight)
     n_vars = sum(len(v) for v in model.x.values())
     stats: dict[str, Any] = {"sessions": len(ds.sessions), "x_variables": n_vars, "seed": seed,
                              "workers": workers, "time_limit_s": time_limit_s}

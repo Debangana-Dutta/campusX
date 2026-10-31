@@ -24,7 +24,16 @@ router = APIRouter(prefix="/disruptions")
 
 
 def _fingerprint() -> str:
-    return hashlib.sha256(json.dumps(sorted((k, list(v)) for k, v in STATE.assignment.items())).encode()).hexdigest()[:16]
+    """Version of everything a proposal depends on: the timetable AND the data behind it (sessions, faculty availability,
+    room closures, priority order). If any of it changes, proposals built earlier are stale and must be regenerated."""
+    live = STATE.live_raw
+    basis = {"assignment": sorted((k, list(v)) for k, v in STATE.assignment.items()),
+             "sessions": sorted(json.dumps(x, sort_keys=True) for x in live.get("sessions", [])),
+             "faculty": sorted(json.dumps({"id": f["id"], "u": f.get("unavailable"), "m": f.get("max_hours_per_day")}, sort_keys=True) for f in live.get("faculty", [])),
+             "rooms": sorted(json.dumps(r, sort_keys=True) for r in live.get("rooms", [])),
+             "closures": sorted(json.dumps(u, sort_keys=True) for u in live.get("room_unavailability", [])),
+             "priority": live.get("priority_order")}
+    return hashlib.sha256(json.dumps(basis, sort_keys=True).encode()).hexdigest()[:16]
 
 
 @router.get("/sample")
@@ -36,9 +45,12 @@ def sample(user: User = Depends(require_roles("admin"))):
 @router.get("")
 def list_disruptions(user: User = Depends(current_user)):
     with session_scope() as s:
+        q = select(DisruptionRecord)
+        if user.role not in ("admin", "department_coordinator"):
+            q = q.where(DisruptionRecord.requested_by == user.id)            # requesters see only their own requests
         return {"disruptions": [{"id": d.id, "status": d.status, "requested_by": d.requested_by, "approved_by": d.approved_by,
                                  "moved": (d.proposal or {}).get("summary", {}).get("moved"),
-                                 "created_at": d.created_at.isoformat()} for d in s.scalars(select(DisruptionRecord))]}
+                                 "created_at": d.created_at.isoformat()} for d in s.scalars(q)]}
 
 
 @router.post("/preview")
@@ -74,7 +86,7 @@ def preview(body: DisruptionIn, user: User = Depends(require_roles("admin", "fac
     proposal = {"feasible": True, "solver_status": rep.status, "minimality": rep.minimality,
                 "summary": {"moved": len(rep.moved), "unchanged": len(rep.unchanged), "added": len(rep.added),
                             "removed": len(rep.removed), "time_changed": sum(1 for m in rep.moved if m["time_changed"])},
-                "moved": rep.moved, "added": rep.added, "removed": rep.removed, "affected": rep.affected,
+                "evidence": rep.evidence, "moved": rep.moved, "added": rep.added, "removed": rep.removed, "affected": rep.affected,
                 "exam_room_changes": res["exam_changes"], "booking_changes": booking_changes,
                 "validation": summ, "baseline_fingerprint": _fingerprint(), "schedule_after": after,
                 "soft_before": (STATE.last_validation or {}).get("soft_total"), "soft_after": summ["soft_total"]}
@@ -83,7 +95,10 @@ def preview(body: DisruptionIn, user: User = Depends(require_roles("admin", "fac
         s.add(DisruptionRecord(id=did, changes={"changes": body.changes}, status=status, proposal=proposal, requested_by=user.id))
     audit.record(user.id, "disruption.preview", did, {"feasible": True, "moved": len(rep.moved), "accepted": summ["accepted"]})
     if user.role != "admin":
-        notify.notify("role:admin", f"{user.name} proposed a change ({did}): {len(rep.moved)} session(s) would move. Review it.", "disruption", "/app/disruptions")
+        msg = f"{user.name} proposed a change ({did}): {len(rep.moved)} session(s) would move. Review it."
+        notify.notify("role:admin", msg, "disruption", "/app/disruptions", sender=user.id, related_id=did, dedupe=f"dis:{did}:admin")
+        if user.department:
+            notify.notify(f"coord:{user.department}", msg, "disruption", "/app/disruptions", sender=user.id, related_id=did, dedupe=f"dis:{did}:coord")
     return {"id": did, "status": status, **{k: v for k, v in proposal.items() if k != "schedule_after"}}
 
 
@@ -91,11 +106,29 @@ def preview(body: DisruptionIn, user: User = Depends(require_roles("admin", "fac
 def comparison(did: str, user: User = Depends(current_user)):
     with session_scope() as s:
         d = s.get(DisruptionRecord, did)
-        if not d:
-            raise HTTPException(404, "unknown disruption")
+        if not d or (user.role not in ("admin", "department_coordinator") and d.requested_by != user.id):
+            raise HTTPException(404, "unknown disruption")          # same answer for 'missing' and 'not yours'
         p = {k: v for k, v in (d.proposal or {}).items() if k != "schedule_after"}
         return {"id": d.id, "status": d.status, "requested_by": d.requested_by, "approved_by": d.approved_by,
                 "changes": d.changes, "proposal": p}
+
+
+@router.post("/{did}/reject")
+def reject(did: str, body: dict | None = None, user: User = Depends(require_roles("admin"))):
+    """Reject a saved proposal. It never touches the active timetable."""
+    reason = str((body or {}).get("reason", "")).strip()[:200]
+    with session_scope() as s:
+        d = s.get(DisruptionRecord, did)
+        if not d:
+            raise HTTPException(404, "unknown disruption")
+        if d.status not in ("previewed", "invalid", "infeasible"):
+            raise HTTPException(409, f"disruption is '{d.status}' and cannot be rejected")
+        d.status, d.approved_by = "rejected", user.id
+        if d.requested_by != user.id:
+            notify.notify(d.requested_by, f"Your change request {did} was not approved." + (f" Reason: {reason}" if reason else ""),
+                          "disruption", "/app/availability", sender=user.id, related_id=did, dedupe=f"dis:{did}:rejected", session=s)
+    audit.record(user.id, "disruption.reject", did, {"reason": reason})
+    return {"rejected": True, "id": did}
 
 
 @router.post("/apply")

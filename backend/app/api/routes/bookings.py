@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -82,9 +83,7 @@ def create_booking(body: BookingIn, user: User = Depends(staff)):
                                              "Widen the window or shorten the event."})
     if body.requested_category == "institute_event" and user.role not in ("admin",):
         pass  # not rejected: the engine caps the *effective* category by role, and the reason says so
-    with session_scope() as s:
-        n = len(list(s.scalars(select(BookingRecord.id)))) + 1
-    bid = f"UR-{n:04d}"
+    bid = f"UR-{uuid.uuid4().hex[:8].upper()}"          # collision-proof (the old count-based id could clash)
     req = {"id": bid, "submitted_at": dt.datetime.now(dt.timezone(dt.timedelta(hours=5, minutes=30))).isoformat(timespec="seconds"),
            "requester": user.org or user.name, "role": DATASET_ROLE[user.role],
            "department": body.department or user.department, "requested_category": body.requested_category,
@@ -102,15 +101,18 @@ def create_booking(body: BookingIn, user: User = Depends(staff)):
     state = "rejected" if dec.status == "rejected" else ("proposed" if human else "confirmed")
     rec = BookingRecord(id=bid, requester_id=user.id, request=req, decision={**dec.as_dict(), "needs_approval": human},
                         state=state)
-    with session_scope() as s:
-        s.add(rec)
-    audit.record(user.id, "booking.create", bid, {"status": dec.status, "state": state})
     kind = {"approved": "booking", "alternative_offered": "alternative", "rejected": "booking"}[dec.status]
-    notify.notify(user.id, f"{bid} '{body.title}': {dec.status.replace('_', ' ')}. {dec.reason}", kind, "/app/bookings")
-    if state == "proposed":
-        notify.notify("role:admin", f"{bid} from {req['requester']} needs approval ({human}).", "booking", "/app/bookings")
-        if human and "lab" in human:
-            notify.notify("role:department_coordinator", f"{bid} (lab booking) needs approval.", "booking", "/app/bookings")
+    with session_scope() as s:             # booking + notifications + audit commit together or not at all
+        s.add(rec)
+        notify.notify(user.id, f"{bid} '{body.title}': {dec.status.replace('_', ' ')}. {dec.reason}", kind, "/app/bookings",
+                      sender="booking-engine", related_id=bid, dedupe=f"booking:{bid}:submitted", session=s)
+        if state == "proposed":
+            notify.notify("role:admin", f"{bid} from {req['requester']} needs approval ({human}).", "booking", "/app/bookings",
+                          sender=user.id, related_id=bid, dedupe=f"booking:{bid}:review-admin", session=s)
+            if human and "lab" in human:
+                notify.notify("role:department_coordinator", f"{bid} (lab booking) needs approval.", "booking", "/app/bookings",
+                              sender=user.id, related_id=bid, dedupe=f"booking:{bid}:review-coord", session=s)
+    audit.record(user.id, "booking.create", bid, {"status": dec.status, "state": state})
     return _view(rec)
 
 
