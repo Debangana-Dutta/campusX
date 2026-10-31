@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.auth import User, current_user
+from app.core.auth import User, require_roles
+
+current_user = require_roles("admin", "faculty", "department_coordinator", "club_representative")
 from app.state import STATE
 
 router = APIRouter(prefix="/reports")

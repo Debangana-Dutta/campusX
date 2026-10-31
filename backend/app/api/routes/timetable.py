@@ -6,6 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.config import get_settings
 from app.core.auth import User, current_user, require_roles
+from app.services.audit import notify
+
+staff = require_roles("admin", "faculty", "department_coordinator", "club_representative")
 from app.schemas.api import GenerateIn
 from app.services.audit import log as audit
 from app.services.scheduling.solver import to_schedule_sessions
@@ -25,7 +28,8 @@ def _entry(sid: str, slot) -> dict[str, Any]:
     ds = STATE.ds
     s = ds.sessions[sid]
     d, p, r = slot
-    return {"session_id": sid, "course_id": s["course_id"], "kind": s["kind"], "day": d, "start_period": p,
+    return {"session_id": sid, "course_id": s["course_id"], "course_title": ds.courses[s["course_id"]]["title"],
+            "faculty_name": ds.faculty[s["faculty_id"]]["name"], "size": s["size"], "kind": s["kind"], "day": d, "start_period": p,
             "end_period": p + s["duration"] - 1, "room_id": r, "faculty_id": s["faculty_id"], "groups": s["groups"],
             "basket_slot": s.get("basket_slot")}
 
@@ -37,15 +41,20 @@ def generate(body: GenerateIn, user: User = Depends(require_roles("admin"))):
                          include_exams=body.include_exams, include_bookings=body.include_bookings,
                          hint_from_saved=not body.fresh)
     audit.record(user.id, "timetable.generate", "timetable", {k: out.get(k) for k in ("ok", "status", "accepted")})
+    if out["ok"]:
+        notify.notify("role:admin", f"New timetable generated (solver {out['status']}, validator "
+                      f"{'accepted' if out.get('accepted') else 'REJECTED'}). Review and approve it.", "timetable", "/app/generate")
+        if STATE.exams:
+            notify.notify("*", "The exam timetable has been published.", "exam", "/app/exams")
     if not out["ok"]:
         raise HTTPException(422, {"message": "no feasible timetable was produced", **{k: out.get(k) for k in ("status", "diagnosis")}})
     return out
 
 
 @router.get("")
-def get_timetable(user: User = Depends(current_user)):
+def get_timetable(user: User = Depends(staff)):
     _ready()
-    return {"sessions": [_entry(s, v) for s, v in sorted(STATE.assignment.items())],
+    return {"status": STATE.status(), "approved_by": STATE.approved_by, "source": STATE.source, "sessions": [_entry(s, v) for s, v in sorted(STATE.assignment.items())],
             "solver": STATE.solver_info, "validation": STATE.last_validation,
             "week7_overrides": STATE.outcome.session_overrides if STATE.outcome else []}
 
@@ -53,14 +62,16 @@ def get_timetable(user: User = Depends(current_user)):
 @router.get("/group/{group_id}")
 def by_group(group_id: str, user: User = Depends(current_user)):
     _ready()
+    if user.role == "student" and user.group_id != group_id:
+        raise HTTPException(403, "students may only view their own group's timetable")
     if group_id not in STATE.ds.groups:
         raise HTTPException(404, f"unknown group {group_id}")
-    return {"group_id": group_id, "sessions": [_entry(s, v) for s, v in sorted(STATE.assignment.items())
+    return {"status": STATE.status(), "group_id": group_id, "sessions": [_entry(s, v) for s, v in sorted(STATE.assignment.items())
                                                if group_id in STATE.ds.sessions[s]["groups"]]}
 
 
 @router.get("/faculty/{faculty_id}")
-def by_faculty(faculty_id: str, user: User = Depends(current_user)):
+def by_faculty(faculty_id: str, user: User = Depends(staff)):
     _ready()
     if faculty_id not in STATE.ds.faculty:
         raise HTTPException(404, f"unknown faculty {faculty_id}")
@@ -71,7 +82,7 @@ def by_faculty(faculty_id: str, user: User = Depends(current_user)):
 
 
 @router.get("/room/{room_id}")
-def by_room(room_id: str, user: User = Depends(current_user)):
+def by_room(room_id: str, user: User = Depends(staff)):
     _ready()
     if room_id not in STATE.ds.rooms:
         raise HTTPException(404, f"unknown room {room_id}")
@@ -82,7 +93,7 @@ def by_room(room_id: str, user: User = Depends(current_user)):
 
 
 @router.post("/validate")
-def validate(user: User = Depends(current_user)):
+def validate(user: User = Depends(require_roles("admin", "department_coordinator"))):
     _ready()
     v = STATE.validate()
     audit.record(user.id, "timetable.validate", "timetable", {"accepted": v.accepted})
@@ -100,3 +111,16 @@ def export(user: User = Depends(require_roles("admin"))):
                                   "validation": v.summary()})
     audit.record(user.id, "timetable.export", "schedule.json", {"soft": v.summary()["soft_total"]})
     return sched
+
+
+@router.post("/approve")
+def approve(user: User = Depends(require_roles("admin"))):
+    """Admin approval: only possible after the official validator accepted the current schedule."""
+    _ready()
+    try:
+        STATE.approve(user.id)
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from e
+    audit.record(user.id, "timetable.approve", "timetable", {})
+    notify.notify("*", "The timetable has been approved by the admin office.", "timetable", "/app/timetable")
+    return {"status": STATE.status(), "approved_by": user.id}
