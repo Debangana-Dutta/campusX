@@ -1,0 +1,39 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+backend/var/*.db
+backend/var/state.json
+.pytest_cache/
+node_modules/
+
+# Python environment and cache
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Local databases and runtime state
+*.db
+*.sqlite
+*.sqlite3
+backend/var/
+
+# Frontend dependencies and builds
+node_modules/
+dist/
+build/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
