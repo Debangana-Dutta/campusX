@@ -10,7 +10,10 @@ from sqlalchemy import select
 from app.core.auth import DATASET_ROLE, User, current_user, require_roles
 from app.models.db import BookingRecord, Notification, session_scope
 from app.schemas.api import BookingIn, DecisionIn
-from app.services.audit import log as audit
+from app.services.audit import log as audit, notify
+from app.services.ai import booking_parser
+
+staff = require_roles("admin", "faculty", "department_coordinator", "club_representative")
 from app.services.bookings.engine import BookingEngine
 from app.state import STATE
 
@@ -52,7 +55,7 @@ def _needs_human(req: dict, dec: dict, eng: BookingEngine) -> str | None:
 
 
 @router.get("")
-def list_bookings(user: User = Depends(current_user)):
+def list_bookings(user: User = Depends(staff)):
     ds = STATE.ds if STATE.imported else None
     items: list[dict[str, Any]] = []
     if ds and STATE.outcome and user.role != "club_representative":
@@ -70,7 +73,7 @@ def list_bookings(user: User = Depends(current_user)):
 
 
 @router.post("", status_code=201)
-def create_booking(body: BookingIn, user: User = Depends(current_user)):
+def create_booking(body: BookingIn, user: User = Depends(staff)):
     eng = _engine()
     longest = max(w.to_period - w.from_period + 1 for w in body.windows)
     if body.duration_periods > longest:
@@ -102,11 +105,71 @@ def create_booking(body: BookingIn, user: User = Depends(current_user)):
     with session_scope() as s:
         s.add(rec)
     audit.record(user.id, "booking.create", bid, {"status": dec.status, "state": state})
+    kind = {"approved": "booking", "alternative_offered": "alternative", "rejected": "booking"}[dec.status]
+    notify.notify(user.id, f"{bid} '{body.title}': {dec.status.replace('_', ' ')}. {dec.reason}", kind, "/app/bookings")
+    if state == "proposed":
+        notify.notify("role:admin", f"{bid} from {req['requester']} needs approval ({human}).", "booking", "/app/bookings")
+        if human and "lab" in human:
+            notify.notify("role:department_coordinator", f"{bid} (lab booking) needs approval.", "booking", "/app/bookings")
     return _view(rec)
 
 
+@router.post("/parse")
+def parse_request(body: dict, user: User = Depends(staff)):
+    """Natural language (English/Hinglish) -> editable structured fields. Extraction ONLY; nothing is decided here."""
+    text = str(body.get("text", "")).strip()
+    if len(text) < 5 or len(text) > 1000:
+        raise HTTPException(422, "describe the request in 5-1000 characters")
+    out = booking_parser.parse(text)
+    audit.record(user.id, "booking.parse", "-", {"source": out["source"], "ai_used": out["ai_used"]})
+    # warnings about the named room vs stated needs (deterministic, from room metadata)
+    f = out["fields"]
+    if STATE.imported and f.get("requested_room") in STATE.ds.rooms:
+        feats = STATE.ds.room_features(f["requested_room"])
+        miss = set(f.get("needs", [])) - feats
+        if miss:
+            alts = [r for r in STATE.ds.rooms if STATE.ds.rooms[r]["type"] == STATE.ds.rooms[f["requested_room"]]["type"]
+                    and set(f.get("needs", [])) <= STATE.ds.room_features(r)]
+            out["warnings"].append(f"{f['requested_room']} lacks {sorted(miss)}." + (f" Consider {alts[0]}." if alts else ""))
+    return out
+
+
+@router.post("/{booking_id}/respond")
+def respond_to_alternative(booking_id: str, body: dict, user: User = Depends(staff)):
+    """The REQUESTER accepts or declines the system's alternative (this is not approving their own request:
+    the placement was chosen and validated by the deterministic engine)."""
+    accept = bool(body.get("accept"))
+    with session_scope() as s:
+        b = s.get(BookingRecord, booking_id)
+        if not b or b.requester_id != user.id:
+            raise HTTPException(404, "booking not found")
+        if b.state != "proposed" or b.decision.get("status") != "alternative_offered":
+            raise HTTPException(409, "there is no pending alternative on this booking")
+        dec = dict(b.decision)
+        if not accept:
+            b.state = "cancelled"
+            dec["reason"] += " (alternative declined by requester)"
+            b.decision = dec
+            audit.record(user.id, "booking.alternative_declined", booking_id, {})
+            return _view(b)
+        eng = _engine()
+        st = eng.state_with(_confirmed(), STATE.outcome.session_overrides if STATE.outcome else [])
+        errs = eng.validate_placement(st, b.request, dec["room_id"], dec["day"], dec["start_period"], dec["end_period"])
+        if errs:
+            raise HTTPException(409, {"message": "the alternative is no longer available", "errors": errs})
+        room = STATE.ds.rooms[dec["room_id"]]
+        if room["type"].startswith("lab_") or room["type"] == "workshop":
+            dec["accepted_by_requester"], dec["needs_approval"] = True, "lab booking needs the department coordinator or an admin"
+            b.decision = dec
+        else:
+            b.state, dec["needs_approval"], dec["accepted_by_requester"] = "confirmed", None, True
+            b.decision = dec
+        audit.record(user.id, "booking.alternative_accepted", booking_id, {"state": b.state})
+        return _view(b)
+
+
 @router.get("/{booking_id}")
-def booking_detail(booking_id: str, user: User = Depends(current_user)):
+def booking_detail(booking_id: str, user: User = Depends(staff)):
     if booking_id.startswith("UR-"):
         with session_scope() as s:
             b = s.get(BookingRecord, booking_id)
@@ -142,7 +205,7 @@ def decide(booking_id: str, body: DecisionIn, user: User = Depends(require_roles
             b.state, b.decided_by = "rejected", user.id
             dec.update(status="rejected", reason=body.reason)
             b.decision = dec
-            s.add(Notification(user_id=b.requester_id, message=f"{booking_id} was rejected: {body.reason}"))
+            s.add(Notification(user_id=b.requester_id, kind="booking", link="/app/bookings", message=f"{booking_id} was rejected: {body.reason}"))
             audit.record(user.id, "booking.reject", booking_id, {"reason": body.reason})
             return _view(b)
         room = body.room_id or dec.get("room_id")
@@ -164,13 +227,13 @@ def decide(booking_id: str, body: DecisionIn, user: User = Depends(require_roles
         dec.update(status="approved" if dec["status"] == "approved" else dec["status"], room_id=room, day=day,
                    start_period=start, end_period=end, needs_approval=None)
         b.decision, b.state, b.decided_by = dec, "confirmed", user.id
-        s.add(Notification(user_id=b.requester_id, message=f"{booking_id} confirmed: {room} {day} P{start}-P{end}"))
+        s.add(Notification(user_id=b.requester_id, kind="booking", link="/app/bookings", message=f"{booking_id} confirmed: {room} {day} P{start}-P{end}"))
         audit.record(user.id, "booking.approve", booking_id, {"room": room, "day": day, "start": start})
         return _view(b)
 
 
 @router.post("/{booking_id}/cancel")
-def cancel(booking_id: str, user: User = Depends(current_user)):
+def cancel(booking_id: str, user: User = Depends(staff)):
     with session_scope() as s:
         b = s.get(BookingRecord, booking_id)
         if not b:
