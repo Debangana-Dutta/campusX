@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
-import { CheckCircle2, Download, GraduationCap, RefreshCw } from 'lucide-react'
+import { CheckCircle2, Download, GraduationCap, RefreshCw, Send } from 'lucide-react'
 import { api } from '../services/api'
 import { useApi } from '../hooks/useApi'
 import { useAuth, useToast } from '../contexts/AppContexts'
-import { Async, Btn, Card, Empty, PageHeader, Pill, Stat, Table, Tabs } from '../components/ui'
+import { Async, Btn, Card, Empty, Field, PageHeader, Pill, Stat, Table, Tabs } from '../components/ui'
 import { download, toCsv } from '../utils/format'
 
 export default function Exams() {
@@ -13,14 +13,19 @@ export default function Exams() {
   const ds = useApi(api.datasetSummary, [], { enabled: user.role !== 'student' })
   const [tab, setTab] = useState('calendar')
   const [busy, setBusy] = useState(false)
+  const [by, setBy] = useState('all')      // all | group | course | room
+  const [pick, setPick] = useState('')
   const cap = useMemo(() => Object.fromEntries((ds.data?.rooms || []).map((r) => [r.id, r.capacity])), [ds.data])
   const regen = async () => { setBusy(true); try { await api.generateExams(); toast('Exam timetable regenerated', 'ok'); ex.reload() } catch (e) { toast(e.message, 'error') } finally { setBusy(false) } }
+  const publish = async (withdraw) => { setBusy(true); try { await api.publishExams(withdraw); toast(withdraw ? 'Exam timetable withdrawn' : 'Exam timetable published. Everyone has been notified.', 'ok'); ex.reload() } catch (e) { toast(`${e.message}${e.detail?.errors ? ': ' + e.detail.errors.slice(0, 2).join('; ') : ''}`, 'error') } finally { setBusy(false) } }
   const exportCsv = () => { const l = ex.data?.exams || []; if (l.length) download('exams.csv', toCsv(l.map((e) => ({ exam: e.exam_id, title: e.title, day: e.day, session: e.session, rooms: e.rooms.join(' '), size: e.size, seats_half_capacity: e.seats_at_half_capacity }))), 'text/csv') }
   return (
     <>
-      <PageHeader title="Examinations" subtitle="Midsem exams from the dataset. Exam seats are half of each room's capacity; one exam may use several rooms."
-        actions={<><Btn onClick={exportCsv}><Download className="h-4 w-4" />CSV</Btn>{user.role === 'admin' && <Btn variant="primary" loading={busy} onClick={regen}><RefreshCw className="h-4 w-4" />Regenerate</Btn>}</>} />
-      <Async state={ex} rows={3} emptyIf={(d) => !d.exams.length} empty={<Empty icon={GraduationCap} title="No exams to show" hint={user.role === 'student' ? 'No exams are scheduled for your group yet.' : 'Generate the exam timetable from Generate Timetable.'} />}>{(d) => {
+      <PageHeader title="Exams" subtitle="Exam seats are half of each room's capacity, so one exam may use several rooms."
+        actions={<><Btn onClick={exportCsv}><Download className="h-4 w-4" />CSV</Btn>{user.role === 'admin' && <Btn loading={busy} onClick={regen}><RefreshCw className="h-4 w-4" />Regenerate</Btn>}{user.role === 'admin' && ex.data?.scheduled && <Btn variant="primary" loading={busy} onClick={() => publish(!!ex.data?.published)}><Send className="h-4 w-4" />{ex.data?.published ? 'Withdraw' : 'Publish'}</Btn>}</>} />
+      <Async state={ex} rows={3} emptyIf={(d) => !d.exams.length} empty={<Empty icon={GraduationCap} title="No exams to show" hint={ex.data?.note || (user.role === 'student' ? 'No exams are published for your group yet.' : 'Generate the exam timetable from Timetable Generator.')} />}>{(d0) => {
+        const d = { ...d0, exams: d0.exams.filter((e) => by === 'all' || !pick || (by === 'group' ? e.groups.includes(pick) : by === 'course' ? e.course_ids.includes(pick) : e.rooms.includes(pick))) }
+        const opts = by === 'group' ? [...new Set(d0.exams.flatMap((e) => e.groups))].sort() : by === 'course' ? [...new Set(d0.exams.flatMap((e) => e.course_ids))].sort() : by === 'room' ? [...new Set(d0.exams.flatMap((e) => e.rooms))].sort() : []
         const sl = d.calendar.sessions, days = d.calendar.days
         const perGroupDay = {}; for (const e of d.exams) for (const g of e.groups) { const k = `${g}|${e.day}`; (perGroupDay[k] ||= []).push(e.exam_id) }
         const crowded = Object.entries(perGroupDay).filter(([, v]) => v.length > 1)
@@ -29,6 +34,9 @@ export default function Exams() {
           <div className="grid gap-5">
             <div className="grid gap-4 sm:grid-cols-3"><Stat icon={GraduationCap} tone="peri" label="Exams" value={d.exams.length} /><Stat icon={CheckCircle2} tone="mint" label="Seats cover every exam" value={d.exams.every((e) => e.seats_at_half_capacity >= e.size) ? 'Yes' : 'No'} hint="at half capacity" />
               <Stat label="Multi-room exams" value={d.exams.filter((e) => e.rooms.length > 1).length} /></div>
+            {user.role === 'admin' && <p className="flex items-center gap-2 text-sm text-muted"><Pill tone={d0.published ? 'ok' : 'warn'}>{d0.published ? 'Published' : 'Draft (not visible to students)'}</Pill>{!d0.published && 'Review the schedule, then publish it.'}</p>}
+            {user.role !== 'student' && <div className="flex flex-wrap items-end gap-3"><Tabs value={by} onChange={(v) => { setBy(v); setPick('') }} tabs={[{ id: 'all', label: 'All' }, { id: 'group', label: 'By group' }, { id: 'course', label: 'By course' }, { id: 'room', label: 'By room' }]} />
+              {by !== 'all' && <Field label={by[0].toUpperCase() + by.slice(1)} id="ex-pick"><select id="ex-pick" className="field min-w-[180px]" value={pick} onChange={(e) => setPick(e.target.value)}><option value="">All</option>{opts.map((o) => <option key={o} value={o}>{o}</option>)}</select></Field>}</div>}
             <Tabs value={tab} onChange={setTab} tabs={[{ id: 'calendar', label: 'Calendar' }, { id: 'table', label: 'Timetable' }, { id: 'rooms', label: 'Room allocation' }, { id: 'conflicts', label: 'Group conflicts' }]} />
             {tab === 'calendar' && <div className="clay-inset overflow-x-auto p-3"><div className="grid min-w-[720px] gap-2" style={{ gridTemplateColumns: `90px repeat(${days.length}, 1fr)` }}>
               <div />{days.map((x) => <div key={x} className="text-center text-xs font-extrabold uppercase text-navy">{x}</div>)}
@@ -39,7 +47,7 @@ export default function Exams() {
               <td className="td">{e.rooms.map((r) => <Pill key={r} tone="info" className="mr-1">{r}{cap[r] ? ` ${Math.floor(cap[r] / 2)}` : ''}</Pill>)}</td><td className="td">{e.seats_at_half_capacity}</td><td className="td">{e.size}</td>
               <td className="td"><Pill tone={e.seats_at_half_capacity >= e.size ? 'ok' : 'bad'}>{e.seats_at_half_capacity >= e.size ? 'Fits' : 'Short'}</Pill></td></tr>)}</Table>}
             {tab === 'conflicts' && <Card><p className="mb-3 text-sm text-muted">No group sits two exams in the same slot (hard rule, enforced). Same-day pairs are a soft penalty.</p>
-              {crowded.length === 0 ? <p className="flex items-center gap-2 font-bold text-ok"><CheckCircle2 className="h-5 w-5" />No group has two exams on the same day.</p> : <ul className="grid gap-1.5">{crowded.map(([k, v]) => <li key={k} className="clay-inset px-3 py-2 text-sm">{k.replace('|', ' on ')}: {v.join(', ')}</li>)}</ul>}
+              {crowded.length === 0 ? <p className="flex items-center gap-2 font-bold text-success"><CheckCircle2 className="h-5 w-5" />No group has two exams on the same day.</p> : <ul className="grid gap-1.5">{crowded.map(([k, v]) => <li key={k} className="clay-inset px-3 py-2 text-sm">{k.replace('|', ' on ')}: {v.join(', ')}</li>)}</ul>}
               <p className="mt-3 text-xs text-muted">{groups.length} group(s) checked.</p></Card>}
           </div>)
       }}</Async>

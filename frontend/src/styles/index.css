@@ -2,12 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ------------------------------------------------------------------ Claymorphism tokens (light default) */
+/* ------------------------------------------------------------------ Tokens: subtle claymorphism, lavender / muted blue / warm off-white */
 :root {
-  --navy: 27 37 89; --ink: 40 52 105; --muted: 100 113 156;
-  --base: 238 243 251; --surface: 247 250 255;
+  --navy: 27 37 89; --ink: 40 52 105; --muted: 84 94 138;
+  --base: 244 242 250; --surface: 251 250 255;
   --lavender: 205 184 255; --mint: 191 235 215; --peach: 255 211 184; --peri: 185 198 255; --sky: 190 224 250; --rose: 255 205 222;
-  --accent: 108 92 231; --ok: 40 150 110; --warn: 214 132 40; --bad: 214 70 96;
+  --accent: 90 74 208; --ok: 40 150 110; --warn: 214 132 40; --bad: 214 70 96;
+  /* semantic tones: every tone is a bg + fg PAIR, tuned per theme (never reuse a background token as text) */
+  --ok-bg: 209 240 227;   --ok-fg: 20 81 63;    --warn-bg: 255 226 205; --warn-fg: 107 58 20;  --bad-bg: 255 214 224; --bad-fg: 122 31 58;
+  --info-bg: 214 224 255; --info-fg: 27 37 89;  --lav-bg: 222 214 255;  --lav-fg: 47 38 112;
+  --glass-bg: 255 255 255; --glass-a: .62; --glass-line: 255 255 255;
   --clay-top: #ffffff; --clay-bottom: #e8effb;
   --sh-dark: rgba(126, 144, 196, 0.34); --sh-light: rgba(255, 255, 255, 0.95);
   --in-dark: rgba(150, 166, 214, 0.28); --in-light: rgba(255, 255, 255, 0.9);
@@ -17,6 +21,9 @@
   --base: 18 21 43; --surface: 26 30 58;
   --lavender: 120 96 200; --mint: 48 120 98; --peach: 170 110 80; --peri: 84 100 190; --sky: 56 104 150; --rose: 170 80 110;
   --accent: 160 148 255; --ok: 90 210 160; --warn: 245 180 90; --bad: 255 120 140;
+  --ok-bg: 24 78 62;      --ok-fg: 140 240 192; --warn-bg: 96 64 30;    --warn-fg: 255 208 150; --bad-bg: 108 40 66;  --bad-fg: 255 176 196;
+  --info-bg: 48 62 132;   --info-fg: 190 204 255; --lav-bg: 72 58 130;  --lav-fg: 220 206 255;
+  --glass-bg: 30 36 78; --glass-a: .58; --glass-line: 150 160 230;
   --clay-top: #2a3068; --clay-bottom: #1d2249;
   --sh-dark: rgba(5, 7, 22, 0.65); --sh-light: rgba(70, 82, 150, 0.30);
   --in-dark: rgba(8, 10, 30, 0.55); --in-light: rgba(90, 104, 180, 0.22);
@@ -53,12 +60,18 @@ body {
   .clay-press:active { transform: translateY(1px) scale(.985); box-shadow: inset 4px 4px 9px var(--in-dark), inset -4px -4px 9px var(--in-light); }
 
   .btn { @apply clay-sm clay-press inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-navy select-none disabled:opacity-50 disabled:pointer-events-none; min-height: 44px; }
-  .btn-primary { background: linear-gradient(145deg, rgb(var(--lavender)), rgb(var(--peri))); color: #1b2559; }
-  .dark .btn-primary { color: #fff; }
-  .btn-mint { background: linear-gradient(145deg, rgb(var(--mint)), rgb(var(--sky) / .8)); color: #17403a; }
-  .dark .btn-mint { color: #eafff6; }
-  .btn-peach { background: linear-gradient(145deg, rgb(var(--peach)), rgb(var(--rose))); color: #5a2a1a; }
-  .dark .btn-peach { color: #fff1ea; }
+  .btn-primary { background: rgb(var(--lav-bg)); color: rgb(var(--lav-fg)); font-weight: 700; }
+  .btn-primary:hover { background: rgb(var(--lav-bg)); filter: brightness(1.04); }
+  .btn-mint { background: rgb(var(--ok-bg)); color: rgb(var(--ok-fg)); }
+  .btn-peach { background: rgb(var(--warn-bg)); color: rgb(var(--warn-fg)); }
+  .tone-ok { background: rgb(var(--ok-bg)); color: rgb(var(--ok-fg)); } .tone-warn { background: rgb(var(--warn-bg)); color: rgb(var(--warn-fg)); }
+  .tone-bad { background: rgb(var(--bad-bg)); color: rgb(var(--bad-fg)); } .tone-info { background: rgb(var(--info-bg)); color: rgb(var(--info-fg)); }
+  .tone-lav { background: rgb(var(--lav-bg)); color: rgb(var(--lav-fg)); } .tone-neutral { background: rgb(var(--surface)); color: rgb(var(--muted)); }
+  .text-success { color: rgb(var(--ok-fg)); } .text-danger { color: rgb(var(--bad-fg)); } .text-warning { color: rgb(var(--warn-fg)); }
+  /* iOS-style glass for nav / floating panels. Fallback: opaque surface when backdrop-filter is unsupported. */
+  .glass { background: rgb(var(--surface)); border: 1px solid rgb(var(--glass-line) / .35); box-shadow: 0 8px 30px var(--sh-dark), inset 0 1px 0 rgb(var(--glass-line) / .5); }
+  @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) { .glass { background: rgb(var(--glass-bg) / var(--glass-a)); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); } }
+  .lift { transition: transform .2s ease, box-shadow .2s ease; } .lift:hover { transform: translateY(-3px); }
   .btn-ghost { box-shadow: none; background: transparent; }
   .btn-ghost:hover { background: rgb(var(--lavender) / .25); }
 
@@ -66,7 +79,7 @@ body {
   .field:focus { box-shadow: inset 5px 5px 11px var(--in-dark), inset -5px -5px 11px var(--in-light), 0 0 0 3px rgb(var(--accent) / .45); }
   .label { @apply mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted; }
   .pill { @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold; box-shadow: 3px 3px 7px var(--sh-dark), -3px -3px 7px var(--sh-light); }
-  .h-page { @apply text-2xl font-extrabold tracking-tight text-navy sm:text-3xl; }
+  .h-page { @apply text-2xl font-bold tracking-tight text-navy; }
   .th { @apply px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-muted; }
   .td { @apply px-3 py-3 text-sm text-ink; }
 }
@@ -75,3 +88,10 @@ body {
 @keyframes pulse { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 ::-webkit-scrollbar { height: 10px; width: 10px; } ::-webkit-scrollbar-thumb { background: rgb(var(--peri) / .6); border-radius: 10px; }
+
+/* Course colours: one class per course (hash of course id), defined for BOTH themes so every timetable view agrees.
+   Backgrounds are pale in light mode and deep in dark mode; text always uses the theme's navy token (checked for contrast). */
+:root { --c0: 222 214 255; --c1: 200 229 255; --c2: 205 240 224; --c3: 255 226 205; --c4: 255 214 230; --c5: 255 241 196; --c6: 214 224 255; --c7: 210 238 240; --c8: 233 216 250; --c9: 226 238 200; --c10: 255 220 210; --c11: 208 228 236; }
+.dark { --c0: 74 62 130; --c1: 44 82 128; --c2: 44 100 82; --c3: 120 82 52; --c4: 120 60 88; --c5: 112 94 40; --c6: 60 72 140; --c7: 40 96 102; --c8: 94 64 126; --c9: 76 96 44; --c10: 122 70 58; --c11: 52 84 100; }
+.cc-0{background:rgb(var(--c0))}.cc-1{background:rgb(var(--c1))}.cc-2{background:rgb(var(--c2))}.cc-3{background:rgb(var(--c3))}.cc-4{background:rgb(var(--c4))}.cc-5{background:rgb(var(--c5))}
+.cc-6{background:rgb(var(--c6))}.cc-7{background:rgb(var(--c7))}.cc-8{background:rgb(var(--c8))}.cc-9{background:rgb(var(--c9))}.cc-10{background:rgb(var(--c10))}.cc-11{background:rgb(var(--c11))}

@@ -8,6 +8,7 @@ import { NAV, ROLE_LABEL } from '../utils/nav'
 import { useApi } from '../hooks/useApi'
 import { api } from '../services/api'
 import { Pill } from '../components/ui'
+import BuddyWidget from '../features/BuddyWidget'
 
 function NavList({ items, collapsed, onNavigate }) {
   return (
@@ -45,7 +46,7 @@ export default function AppShell() {
   useEffect(() => { const t = setInterval(() => reload.current(), 30000); return () => clearInterval(t) }, [])
   useEffect(() => { setDrawer(false); reload.current() }, [loc.pathname])
   const current = items.find((n) => (n.end ? loc.pathname === n.to : loc.pathname.startsWith(n.to)))
-  const crumbs = ['Campus X', current?.label || 'Overview']
+  const crumbs = ['OptiCampus', current?.label || 'Overview']
 
   const search = (e) => {
     e.preventDefault()
@@ -73,7 +74,7 @@ export default function AppShell() {
         )}
       </AnimatePresence>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="clay sticky top-3 z-30 m-3 mb-0 flex items-center gap-2 p-2.5 sm:gap-3 sm:p-3">
+        <header className="glass sticky top-3 z-30 m-3 mb-0 flex rounded-2xl items-center gap-2 p-2.5 sm:gap-3 sm:p-3">
           <button className="btn !p-2.5 lg:hidden" onClick={() => setDrawer(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></button>
           <button className="btn !p-2.5 hidden lg:inline-flex" onClick={() => setCollapsed((c) => !c)} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>{collapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}</button>
           <div className="hidden min-w-0 md:block">
@@ -96,6 +97,7 @@ export default function AppShell() {
           </AnimatePresence>
         </main>
       </div>
+      <BuddyWidget />
     </div>
   )
 }
@@ -117,7 +119,7 @@ function ProfileMenu({ user, onLogout }) {
         <div role="menu" className="clay absolute right-0 top-14 z-40 w-64 p-4">
           <p className="truncate font-extrabold text-navy">{user.name}</p>
           <Pill tone="lav" className="mt-2">{ROLE_LABEL[user.role]}</Pill>
-          {user.mode === 'local' && <p className="mt-3 text-xs text-muted">Signed in with LOCAL DEMO authentication (not production).</p>}
+          {user.mode === 'local' && <p className="mt-3 text-xs text-muted"></p>}
           <button role="menuitem" className="btn btn-peach mt-4 w-full" onClick={onLogout}><LogOut className="h-4 w-4" />Sign out</button>
         </div>
       )}

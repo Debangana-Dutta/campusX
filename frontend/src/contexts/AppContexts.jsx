@@ -33,7 +33,7 @@ export function ToastProvider({ children }) {
         <AnimatePresence>
           {items.map((t) => {
             const I = icons[t.kind] || Info
-            const tone = t.kind === 'ok' ? 'text-ok' : t.kind === 'error' ? 'text-bad' : 'text-accent'
+            const tone = t.kind === 'ok' ? 'text-success' : t.kind === 'error' ? 'text-danger' : 'text-accent'
             return (
               <motion.div key={t.id} initial={{ opacity: 0, y: 16, scale: .96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, x: 40 }}
                 className="clay pointer-events-auto flex items-start gap-3 p-4">
@@ -67,8 +67,8 @@ export function AuthProvider({ children }) {
     window.addEventListener('cx-unauthorized', h)
     return () => window.removeEventListener('cx-unauthorized', h)
   }, [])
-  const login = useCallback(async (username, password) => {
-    const r = await api.login(username, password)
+  const login = useCallback(async (email, password, remember = false) => {
+    const r = await api.login(email, password, remember)
     tokenStore.set(r.token)
     setExpired(false)
     setUser(await api.me())

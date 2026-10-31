@@ -50,7 +50,7 @@ export function TimetableGrid({ entries, onSelect, moved }) {
           <div key={p} style={{ gridColumn: 1, gridRow: rowOf(p) }} className="flex flex-col items-center justify-center text-xs font-bold text-muted">
             <span className="text-navy">P{p}</span><span>{PERIOD_TIME[p]}</span></div>
         ))}
-        <div style={{ gridColumn: '1 / -1', gridRow: 7 }} className="mx-1 my-1 grid place-items-center rounded-xl bg-peach/40 text-[11px] font-extrabold uppercase tracking-[.25em] text-[#6b3a14] dark:text-peach">Lunch &middot; 13:00-14:00</div>
+        <div style={{ gridColumn: '1 / -1', gridRow: 7 }} className="mx-1 my-1 grid place-items-center rounded-xl tone-warn text-[11px] font-bold uppercase tracking-[.25em]">Lunch &middot; 13:00-14:00</div>
         {PERIODS.flatMap((p) => DAYS.map((d, i) => <div key={`${d}${p}`} style={{ gridColumn: i + 2, gridRow: rowOf(p) }} className="m-0.5 rounded-2xl border border-[rgb(var(--peri)/.22)]" />))}
         {groups.map((l) => <Card key={l[0].session_id} list={l} onSelect={onSelect} moved={moved} />)}
       </div>

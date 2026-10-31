@@ -4,7 +4,8 @@ import Guard from './routes/Guard'
 import AppShell from './layouts/AppShell'
 import { LoadingBlock } from './components/ui'
 import Landing from './pages/Landing'
-import Login from './pages/Login'
+import { ForgotPassword, Login, RequestAccess, ResetPassword } from './pages/Auth'
+import BuddyWidget from './features/BuddyWidget'
 
 const P = (f) => lazy(f)
 const Overview = P(() => import('./pages/Overview'))
@@ -19,7 +20,9 @@ const Exams = P(() => import('./pages/Exams'))
 const Analytics = P(() => import('./pages/Analytics'))
 const Users = P(() => import('./pages/Users'))
 const Notifications = P(() => import('./pages/Notifications'))
-const Buddy = P(() => import('./pages/Buddy'))
+const Assistant = P(() => import('./pages/Assistant'))
+const Faq = P(() => import('./pages/Faq'))
+const Data = P(() => import('./pages/Data'))
 const Settings = P(() => import('./pages/Settings'))
 const Availability = P(() => import('./pages/Availability'))
 const Events = P(() => import('./pages/Events'))
@@ -36,6 +39,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/request-access" element={<RequestAccess />} />
         <Route path="/app" element={<Guard><AppShell /></Guard>}>
           {route('', Overview)}
           {route('timetable', Timetable)}
@@ -43,13 +49,16 @@ export default function App() {
           {route('validation', Validation, ['admin', 'department_coordinator'])}
           {route('venues', Venues, STAFF)}
           {route('bookings', Bookings, STAFF)}
-          {route('request-venue', RequestVenue, ['admin', 'department_coordinator', 'club_representative'])}
+          {route('request-venue', RequestVenue, ['admin', 'faculty', 'department_coordinator', 'club_representative'])}
           {route('disruptions', Disruptions, A)}
           {route('exams', Exams)}
           {route('analytics', Analytics, STAFF)}
           {route('users', Users, A)}
           {route('notifications', Notifications)}
-          {route('buddy', Buddy)}
+          {route('assistant', Assistant, ['faculty'])}
+          {route('faq', Faq)}
+          {route('data', Data, A)}
+          <Route path="buddy" element={<Navigate to="/app/faq" replace />} />
           {route('settings', Settings)}
           {route('availability', Availability, ['faculty'])}
           {route('events', Events)}

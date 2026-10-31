@@ -32,7 +32,7 @@ export default function Venues() {
   const toggle = (x) => setF((s) => ({ ...s, feats: s.feats.includes(x) ? s.feats.filter((y) => y !== x) : [...s.feats, x] }))
   return (
     <>
-      <PageHeader title="Venues" subtitle="Room directory from the dataset with real closures, Spectra bookings and teaching load. 'Free at' checks classes, closures and bookings." />
+      <PageHeader title="Rooms" subtitle="Find a room by type, size, features and availability." />
       <Card className="mb-5 grid gap-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Field label="Room type" id="vt"><select id="vt" className="field" value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}><option value="">Any</option>{types.map((t) => <option key={t} value={t}>{titleCase(t)}</option>)}</select></Field>
@@ -52,10 +52,10 @@ export default function Venues() {
                   <div className="flex gap-1.5"><Pill tone="info"><Users className="h-3 w-3" />{r.capacity}</Pill>{r.accessible && <Pill tone="ok"><Accessibility className="h-3 w-3" />Accessible</Pill>}</div></div>
                 <div className="mt-2 flex flex-wrap gap-1.5">{r.features.map((x) => <Pill key={x} tone="lav">{titleCase(x)}</Pill>)}</div>
                 <p className="mt-2 text-xs text-muted">Allowed uses: {r.allowed_uses.join(', ')} &middot; {r.teaching_hours} teaching h/week</p>
-                {r.closures.map((c, i) => <p key={i} className="mt-2 flex items-start gap-1.5 rounded-xl bg-peach/50 px-2.5 py-1.5 text-xs font-semibold text-[#6b3a14] dark:text-peach"><Wrench className="mt-0.5 h-3.5 w-3.5 shrink-0" />{c.reason || 'Closed'}: {c.day} P{c.periods[0]}-P{c.periods.at(-1)}</p>)}
+                {r.closures.map((c, i) => <p key={i} className="mt-2 flex items-start gap-1.5 rounded-xl tone-warn px-2.5 py-1.5 text-xs font-semibold"><Wrench className="mt-0.5 h-3.5 w-3.5 shrink-0" />{c.reason || 'Closed'}: {c.day} P{c.periods[0]}-P{c.periods.at(-1)}</p>)}
                 {r.bookings.length > 0 && <ul className="mt-2 grid gap-1">{r.bookings.map((b) => <li key={b.request_id} className="truncate rounded-xl bg-peri/40 px-2.5 py-1 text-xs font-semibold text-navy">{b.title} &middot; {b.day} P{b.from}-P{b.to}</li>)}</ul>}
               </Card>))}</div>)}
-          <Card><h2 className="mb-1 text-lg font-extrabold text-navy">Weekly teaching hours by room</h2><p className="mb-3 text-xs text-muted">From the generated timetable (45 teaching periods per room per week).</p>
+          <Card><h2 className="mb-1 text-lg font-extrabold text-navy">Room usage</h2><p className="mb-3 text-xs text-muted">From the generated timetable (45 teaching periods per room per week).</p>
             <div className="h-64"><ResponsiveContainer><BarChart data={[...v.data.rooms].sort((a, b) => b.teaching_hours - a.teaching_hours).slice(0, 15).map((r) => ({ n: r.id, h: r.teaching_hours }))}>
               <XAxis dataKey="n" tick={{ fill: 'currentColor', fontSize: 11 }} axisLine={false} tickLine={false} interval={0} angle={-35} textAnchor="end" height={55} /><YAxis tick={{ fill: 'currentColor', fontSize: 11 }} axisLine={false} tickLine={false} width={28} /><Tooltip cursor={false} />
               <Bar dataKey="h" name="Hours" fill="#b9a6ff" radius={[8, 8, 8, 8]} /></BarChart></ResponsiveContainer></div></Card>
