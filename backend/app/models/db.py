@@ -66,6 +66,17 @@ class TimetableVersion(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class ExamRun(Base):
+    """One exam-scheduling run (the full exam list as exported, plus its solver status and penalty)."""
+    __tablename__ = "exam_runs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    solver_status: Mapped[str] = mapped_column(String(24))
+    penalty: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    exams: Mapped[list] = mapped_column(JSON)
+    created_by: Mapped[str] = mapped_column(String(64), default="system")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class DisruptionRecord(Base):
     __tablename__ = "disruptions"
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -80,10 +91,20 @@ class DisruptionRecord(Base):
 class Notification(Base):
     __tablename__ = "notifications"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)   # audience: user id | "role:<role>" | "*"
     message: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(String(32), default="info")
+    link: Mapped[str | None] = mapped_column(String(120), nullable=True)
     read: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class NotificationRead(Base):
+    """Per-user read receipts so broadcast notifications can be read independently."""
+    __tablename__ = "notification_reads"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    notification_id: Mapped[int] = mapped_column(Integer, index=True)
 
 
 class AuditEvent(Base):
@@ -124,3 +145,18 @@ def session_scope():
         raise
     finally:
         s.close()
+
+
+def record_version(kind: str, solver_status: str, validated: bool, hard: int, soft: int | None,
+                   schedule: dict, created_by: str = "system", exam_status: str | None = None,
+                   exam_penalty: int | None = None) -> None:
+    """Persist a timetable version (+ the exam run inside it) for history/audit. Failure must not break the request."""
+    import logging
+    try:
+        with session_scope() as s:
+            s.add(TimetableVersion(kind=kind, solver_status=solver_status, validated=validated, hard_violations=hard,
+                                   soft_total=soft, schedule=schedule, created_by=created_by))
+            if schedule.get("exams"):
+                s.add(ExamRun(solver_status=exam_status or "n/a", penalty=exam_penalty, exams=schedule["exams"], created_by=created_by))
+    except Exception:  # noqa: BLE001
+        logging.getLogger("campusx.db").exception("could not record timetable version")
