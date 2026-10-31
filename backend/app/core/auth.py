@@ -20,6 +20,7 @@ from fastapi import Depends, Header, HTTPException
 from app.config import get_settings
 
 ROLES = ("admin", "faculty", "department_coordinator", "club_representative")
+STUDENT = "student"   # read-only experience; never an approval role
 # dataset booking `role` value for each platform role
 DATASET_ROLE = {"admin": "admin", "faculty": "faculty", "department_coordinator": "department_coordinator",
                 "club_representative": "club"}
@@ -29,6 +30,7 @@ DEMO_USERS = {
     "faculty": {"role": "faculty", "name": "Dr. Ananya Mishra (demo)", "department": "CSE", "faculty_id": "F01", "org": None},
     "coordinator": {"role": "department_coordinator", "name": "CSE Coordinator (demo)", "department": "CSE", "faculty_id": None, "org": None},
     "club": {"role": "club_representative", "name": "Dramatics Society (demo)", "department": None, "faculty_id": None, "org": "Dramatics Society"},
+    "student": {"role": "student", "name": "CSE Year 2 student (demo)", "department": "CSE", "faculty_id": None, "org": None, "group_id": "CSE-2"},
 }
 
 
@@ -41,6 +43,7 @@ class User:
     faculty_id: str | None = None
     org: str | None = None
     mode: str = "local"
+    group_id: str | None = None
 
 
 def _b64(b: bytes) -> str:
@@ -69,7 +72,7 @@ def _verify_local(token: str) -> User:
         u = DEMO_USERS[claims["sub"]]
     except Exception as e:  # noqa: BLE001
         raise HTTPException(401, "invalid or expired token") from e
-    return User(claims["sub"], u["role"], u["name"], u["department"], u["faculty_id"], u["org"], "local")
+    return User(claims["sub"], u["role"], u["name"], u["department"], u["faculty_id"], u["org"], "local", u.get("group_id"))
 
 
 def _verify_supabase(token: str) -> User:
@@ -86,12 +89,12 @@ def _verify_supabase(token: str) -> User:
             raise ValueError("expired")
         meta = c.get("app_metadata", {})
         role = meta.get("role")
-        if role not in ROLES:
+        if role not in ROLES + (STUDENT,):
             raise ValueError("no valid role assigned")
     except Exception as e:  # noqa: BLE001
         raise HTTPException(401, "invalid token") from e
     return User(c["sub"], role, c.get("email", c["sub"]), meta.get("department"), meta.get("faculty_id"),
-                meta.get("organisation"), "supabase")
+                meta.get("organisation"), "supabase", meta.get("group_id"))
 
 
 def current_user(authorization: str | None = Header(default=None)) -> User:

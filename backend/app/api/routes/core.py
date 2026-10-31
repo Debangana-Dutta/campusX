@@ -60,7 +60,7 @@ def dataset_import(reset: bool = False, user: User = Depends(require_roles("admi
 
 
 @router.get("/dataset/summary")
-def dataset_summary():
+def dataset_summary(user: User = Depends(current_user)):
     _need_data()
     ds = STATE.ds
     return {"dataset_id": ds.raw["dataset_id"], "institute": ds.raw.get("institute"),
