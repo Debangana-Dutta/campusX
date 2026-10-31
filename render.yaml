@@ -1,0 +1,18 @@
+# Render blueprint for the backend. The repo root must be the service root because the API reads source_files/ and exports/.
+services:
+  - type: web
+    name: campus-x-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && PYTHONPATH=. uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - { key: PYTHON_VERSION, value: 3.12.3 }
+      - { key: AUTH_MODE, value: local }          # set to "supabase" once Supabase Auth is configured
+      - { key: CORS_ORIGINS, sync: false }        # e.g. https://your-app.vercel.app
+      - { key: LOCAL_AUTH_SECRET, generateValue: true }
+      - { key: DEMO_PASSWORD, sync: false }
+      - { key: DATABASE_URL, sync: false }        # Supabase Postgres URI (optional; SQLite is ephemeral on Render)
+      - { key: SUPABASE_JWT_SECRET, sync: false }
+      - { key: GEMINI_API_KEY, sync: false }      # optional; deterministic fallbacks work without it
