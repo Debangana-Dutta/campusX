@@ -1,10 +1,43 @@
+# 🏆 Tech Zephyr 4.0 | Final Round Submission
 # OptiCampus | Smart Campus Scheduling & Venue Management Platform
 
 **One Campus. Smarter Spaces. Seamless Scheduling.**
 
-OptiCampus is a smart campus scheduling and venue management platform designed to simplify academic timetable coordination, room reservations, event planning, and institutional resource management. It provides a centralised system where administrators, faculty members, department coordinators, club representatives, and students can manage campus activities through a structured, role-based interface.
+<p align="center">
+  <strong>TECH ZEPHYR 4.0 · IIT BHUBANESWAR</strong><br/>
+  Web Development Track · Final Round
+</p>
 
-Instead of depending on spreadsheets, phone calls, and scattered WhatsApp conversations, OptiCampus brings campus scheduling and venue coordination into one accessible platform.
+---
+
+## 🚀 About Tech Zephyr 4.0
+
+**Tech Zephyr 4.0** is a technology-focused competition organised by the Indian Institute of Technology (IIT) Bhubaneswar. It brings together participants to apply their technical knowledge, creativity, problem-solving abilities, and development skills to practical challenges.
+
+The Tech Zephyr Web Hackathon challenges participants to design, develop, and deploy functional web applications under time constraints. It emphasises the combination of frontend development, backend functionality, thoughtful user experience, and practical implementation.
+
+The Web Hackathon is structured around two rounds:
+
+- **Round 1 – Qualifying Round:** An online development challenge in which participants build a functional website using the provided resources and requirements.
+- **Round 2 – Offline Finale:** Shortlisted participants advance to the final round at IIT Bhubaneswar, where they take on the next stage of the competition.
+
+The event encourages participants to move beyond basic website development and build complete, usable digital solutions.
+
+**Official event information:** [Tech Zephyr 4.0 Web Hackathon](https://tech-zephyr-4-0.vercel.app/Competitions/web-hackathon)
+
+## 💻 About Our Final Round Project
+
+For the Tech Zephyr 4.0 Web Development Track, our project is **OptiCampus**, a smart campus scheduling and venue management platform.
+
+OptiCampus addresses the challenges educational institutions face when coordinating academic schedules, classrooms, shared venues, departmental activities, and student events.
+
+The platform aims to replace fragmented spreadsheets, phone calls, and messaging-based coordination with a centralised digital system.
+
+It brings administrators, faculty members, department coordinators, club representatives, and students into one structured campus management environment.
+
+---
+
+## 🔗 Project Links
 
 <p align="center">
   <a href="https://campusx-pink.vercel.app/">
@@ -20,8 +53,10 @@ Instead of depending on spreadsheets, phone calls, and scattered WhatsApp conver
 
 ---
 
-## Table of Contents
+## 📑 Table of Contents
 
+- [About Tech Zephyr 4.0](#-about-tech-zephyr-40)
+- [About Our Final Round Project](#-about-our-final-round-project)
 - [Project Overview](#-project-overview)
 - [Problem Statement](#-problem-statement)
 - [Our Solution](#-our-solution)
@@ -41,13 +76,12 @@ Instead of depending on spreadsheets, phone calls, and scattered WhatsApp conver
 - [Testing and Verification](#-testing-and-verification)
 - [Future Enhancements](#-future-enhancements)
 - [Hackathon Context](#-hackathon-context)
-- [Project Links](#-project-links)
 
 ---
 
 ## 🎯 Project Overview
 
-OptiCampus addresses the everyday scheduling and venue coordination challenges faced by educational institutions.
+OptiCampus is a smart campus scheduling and venue management platform designed to simplify academic timetable coordination, room reservations, event planning, and institutional resource management.
 
 In a typical campus environment, multiple departments, faculty members, student clubs, and administrative teams need access to shared spaces. Managing these requirements through disconnected spreadsheets and informal communication channels makes it difficult to maintain an accurate overview of campus resources.
 
@@ -580,10 +614,15 @@ These enhancements represent possible future development directions and are not 
 
 ## 🏆 Hackathon Context
 
-**Event:** Tech Zephyr  
-**Institution:** IIT Bhubaneswar  
-**Track:** Web Development  
-**Problem Category:** Campus Scheduling and Venue Management
+| Detail | Information |
+|---|---|
+| Event | Tech Zephyr 4.0 |
+| Institution | IIT Bhubaneswar |
+| Competition | Web Hackathon |
+| Track | Web Development |
+| Stage | Final Round |
+| Problem Category | Campus Scheduling and Venue Management |
+| Project | OptiCampus |
 
 OptiCampus was developed as a solution to the challenges of campus scheduling, shared venue coordination, and administrative access management.
 
@@ -599,10 +638,12 @@ The project focuses on building a practical and accessible platform that can hel
 | GitHub Repository | [OptiCampus Repository](https://github.com/Debangana-Dutta/OptiCampus) |
 | Backend API | [OptiCampus API](https://campus-x-api-8o6d.onrender.com) |
 | API Documentation | [Swagger UI](https://campus-x-api-8o6d.onrender.com/docs) |
+| Tech Zephyr Web Hackathon | [Official Event Page](https://tech-zephyr-4-0.vercel.app/Competitions/web-hackathon) |
 
 ---
 
 <p align="center">
   <strong>OptiCampus</strong><br/>
-  One Campus. Smarter Spaces. Seamless Scheduling.
+  One Campus. Smarter Spaces. Seamless Scheduling.<br/><br/>
+  Built for Tech Zephyr 4.0 · IIT Bhubaneswar
 </p>
