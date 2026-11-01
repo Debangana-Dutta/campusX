@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import bookings, core, disruptions, exams, platform, reports, timetable
+from app.api.routes import bookings, core, disruptions, exams, faculty_assistant, ops, platform, reports, timetable
 from app.config import get_settings
 from app.models.db import init_db
 from app.state import STATE
@@ -25,6 +25,8 @@ async def lifespan(app: FastAPI):
     if st.auth_mode == "local" and st.local_auth_secret == "dev-only-secret-change-me":
         log.warning("SECURITY: AUTH_MODE=local with the default LOCAL_AUTH_SECRET. Set LOCAL_AUTH_SECRET and DEMO_PASSWORD "
                     "before exposing this beyond local development; local auth is a demo stub, not production authentication.")
+    from app.services import accounts
+    log.info("seeded %d demo account(s)", accounts.seed_demo_users())
     rep = STATE.import_dataset()
     log.info("dataset import ok=%s counts=%s", rep.ok, rep.counts)
     if rep.ok and not STATE.assignment:
@@ -40,7 +42,7 @@ app = FastAPI(title="Campus X", version="0.1.0", lifespan=lifespan,
               description="One Campus. Zero Clashes. Smarter Decisions.")
 app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in st.cors_origins.split(",")],
                    allow_methods=["*"], allow_headers=["*"])
-for r in (core.router, timetable.router, bookings.router, exams.router, disruptions.router, reports.router, platform.router):
+for r in (core.router, timetable.router, bookings.router, exams.router, disruptions.router, reports.router, platform.router, ops.router, faculty_assistant.router):
     app.include_router(r, prefix="/api")
 
 

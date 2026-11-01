@@ -68,9 +68,11 @@ def parse_rules(text: str, today: dt.date | None = None) -> dict[str, Any]:
 
     # ---- times -> periods
     start_p = end_p = None
-    m = re.search(r"(\d{1,2})(?::\d\d)?\s*(am|pm)?\s*(?:to|-|se|till|until)\s*(\d{1,2})(?::\d\d)?\s*(am|pm)?", t)
+    m = re.search(r"(\d{1,2})(?::\d\d)?\s*(am|pm|baje)?\s*(?:to|-|se|till|until)\s*(\d{1,2})(?::\d\d)?\s*(am|pm|baje)?", t)
     if m:
         a, ap1, b, ap2 = int(m.group(1)), m.group(2), int(m.group(3)), m.group(4)
+        ap1 = ap1 if ap1 in ("am", "pm") else None          # "baje" means o'clock, not am/pm
+        ap2 = ap2 if ap2 in ("am", "pm") else None
         ap1 = ap1 or ap2 if (ap2 and ap1 is None and _h24(a, ap2) < _h24(b, ap2)) else ap1
         h1, h2 = _h24(a, ap1), _h24(b, ap2 or ap1)
         start_p, end_p = hour_to_period(h1), hour_to_period(h2 - 1)
@@ -141,6 +143,11 @@ def parse_rules(text: str, today: dt.date | None = None) -> dict[str, Any]:
     m = re.search(r"\b(AUD|OAT|SH-\d|LH-\d|CR-\d{3}|CS-LAB-\d|ELEC-LAB-\d|PHY-LAB|MECH-WS|CIVIL-LAB)\b", text.upper())
     if m:
         room = m.group(1)
+    else:
+        m = re.search(r"\b(?:computer|cs)\s+lab\s*-?\s*(\d)\b", t)     # "computer lab 2" -> CS-LAB-2
+        if m:
+            room = f"CS-LAB-{m.group(1)}"
+            rt = ["lab_cs"]
     if not rt and not room:
         follow.append("What kind of venue do you need (classroom, seminar hall, auditorium, lab, open-air theatre)?")
 

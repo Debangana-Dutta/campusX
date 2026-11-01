@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, select
 
 from app.config import get_settings
-from app.core.auth import DEMO_USERS, ROLES, User, current_user, require_roles
+from app.core.auth import ROLES, User, current_user, require_roles
+from app.models.db import User as UserRow
 from app.models.db import (BookingRecord, DisruptionRecord, Notification, NotificationRead, RoleAssignment, session_scope)
 from app.services.ai import buddy, gemini
 from app.services.audit import log as audit, notify
@@ -56,7 +57,7 @@ def buddy_ask(body: dict, user: User = Depends(current_user)):
         return {"answer": "No timetable is available yet, so I can't answer from timetable data.", "intent": "none",
                 "facts": {}, "ai_used": False, "ai_error": None}
     out = buddy.ask(q, user, STATE.ds, STATE.assignment, STATE.exams, STATE.applied_disruptions,
-                    group_id=body.get("group_id"), faculty_id=body.get("faculty_id"))
+                    group_id=body.get("group_id"), faculty_id=body.get("faculty_id"), exams_published=STATE.exams_published)
     audit.record(user.id, "buddy.ask", out["intent"], {"ai_used": out["ai_used"]})
     return out
 
@@ -101,6 +102,8 @@ def summary(user: User = Depends(staff)):
         user_bookings = list(s.scalars(select(BookingRecord)))
         dis = list(s.scalars(select(DisruptionRecord)))
     pending = [b for b in user_bookings if b.state == "proposed"]
+    with session_scope() as s2:
+        pending_accounts = len(list(s2.scalars(select(UserRow.id).where(UserRow.status == "pending")))) if user.role == "admin" else 0
     v = STATE.last_validation or {}
     decs = STATE.outcome.decisions if STATE.outcome else []
     out: dict[str, Any] = {
@@ -108,7 +111,7 @@ def summary(user: User = Depends(staff)):
         "sessions_total": len(ds.sessions) if ds else 0, "sessions_scheduled": len(STATE.assignment),
         "validation": {"accepted": v.get("accepted"), "hard_violation_count": v.get("hard_violation_count"),
                        "soft_total": v.get("soft_total")} if v else None,
-        "pending_bookings": len(pending), "user_bookings": len(user_bookings),
+        "pending_bookings": len(pending), "pending_accounts": pending_accounts, "user_bookings": len(user_bookings),
         "active_disruptions": len([d for d in dis if d.status == "previewed"]),
         "applied_disruptions": len(STATE.applied_disruptions),
         "exams_scheduled": len(STATE.exams or []), "exams_total": len(ds.exams) if ds else 0,
@@ -145,11 +148,37 @@ def users(user: User = Depends(admin)):
     st = get_settings()
     with session_scope() as s:
         ra = [{"user_id": r.user_id, "role": r.role, "granted_by": r.granted_by} for r in s.scalars(select(RoleAssignment))]
-    return {"auth_mode": st.auth_mode,
-            "note": ("LOCAL DEVELOPMENT AUTH: these are fixed demo accounts, not production identities"
-                     if st.auth_mode == "local" else "Roles come from Supabase app_metadata; assignments below are recorded by this backend"),
-            "accounts": [{"username": k, "role": v["role"], "name": v["name"], "department": v["department"]} for k, v in DEMO_USERS.items()]
-            if st.auth_mode == "local" else [], "role_assignments": ra}
+        rows = list(s.scalars(select(UserRow).order_by(UserRow.created_at)))
+        accounts = [{"email": u.email, "name": u.name, "role": u.role, "status": u.status, "department": u.department,
+                     "requested_role": u.requested_role, "created_at": u.created_at.isoformat()} for u in rows]
+    return {"auth_mode": st.auth_mode, "accounts": accounts, "role_assignments": ra,
+            "note": "Accounts are stored in the database with hashed passwords." if st.auth_mode == "local"
+            else "Roles come from Supabase app_metadata; assignments below are recorded by this backend"}
+
+
+@router.post("/admin/accounts/{email}/decision")
+def decide_account(email: str, body: dict, user: User = Depends(admin)):
+    """Approve or reject an access request. Admins cannot decide on their own account; Admin role is never grantable here."""
+    email = email.lower()
+    if email == user.id:
+        raise HTTPException(403, "you cannot decide on your own account")
+    approve = body.get("action") == "approve"
+    role = body.get("role")
+    with session_scope() as s:
+        u = s.get(UserRow, email)
+        if not u or u.status != "pending":
+            raise HTTPException(404, "no pending request for this email")
+        if approve:
+            if role and role not in ROLES[1:]:
+                raise HTTPException(422, "role must be faculty, department_coordinator or club_representative")
+            u.role, u.status = (role or u.requested_role), "active"
+        else:
+            u.status = "rejected"
+        u.decided_by = user.id
+        notify.notify(u.id, f"Your account request was {'approved. You can sign in now.' if approve else 'not approved.'}",
+                      "account", None, sender=user.id, related_id=u.id, dedupe=f"account-decision:{u.id}:{u.status}", session=s)
+    audit.record(user.id, "account.approve" if approve else "account.reject", email, {"role": role})
+    return {"email": email, "status": "active" if approve else "rejected"}
 
 
 @router.post("/admin/role-assignments")
@@ -157,7 +186,7 @@ def assign_role(body: dict, user: User = Depends(admin)):
     uid, role = str(body.get("user_id", "")).strip(), body.get("role")
     if role not in ROLES:
         raise HTTPException(422, f"role must be one of {list(ROLES)}")
-    if not uid or uid == user.id:
+    if not uid or uid.lower() in {user.id.lower(), user.id.split("@")[0].lower()}:
         raise HTTPException(403, "you cannot assign or change your own role")
     with session_scope() as s:
         s.add(RoleAssignment(user_id=uid, role=role, granted_by=user.id))

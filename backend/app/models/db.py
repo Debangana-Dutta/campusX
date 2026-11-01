@@ -93,8 +93,11 @@ class Notification(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(String(64), index=True)   # audience: user id | "role:<role>" | "*"
     message: Mapped[str] = mapped_column(Text)
-    kind: Mapped[str] = mapped_column(String(32), default="info")
+    kind: Mapped[str] = mapped_column(String(32), default="info")           # notification type
     link: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    sender: Mapped[str | None] = mapped_column(String(64), nullable=True)    # originating user / system action
+    related_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    dedupe_key: Mapped[str | None] = mapped_column(String(160), nullable=True, unique=True)
     read: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
@@ -105,6 +108,43 @@ class NotificationRead(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(String(64), index=True)
     notification_id: Mapped[int] = mapped_column(Integer, index=True)
+
+
+class User(Base):
+    """Real accounts. Passwords are stored only as scrypt hashes. status: active | pending | rejected | disabled."""
+    __tablename__ = "users"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)             # = lowercase email
+    email: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    role: Mapped[str] = mapped_column(String(32))                             # 4 official roles, or "student" (read-only view)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    password_hash: Mapped[str] = mapped_column(String(300))
+    department: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    faculty_id: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    group_id: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    organisation: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    requested_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    decided_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class PasswordReset(Base):
+    """Single-use, time-limited reset tokens. Only a SHA-256 of the token is stored."""
+    __tablename__ = "password_resets"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class KeyValue(Base):
+    """Persistent application state (current timetable, exams, booking decisions, applied changes, settings)."""
+    __tablename__ = "app_kv"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
 
 class AuditEvent(Base):
@@ -128,8 +168,38 @@ def init_db(url: str | None = None) -> None:
     if url.startswith("sqlite"):
         st.state_dir.mkdir(parents=True, exist_ok=True)
     _engine = create_engine(url, future=True, connect_args={"check_same_thread": False} if url.startswith("sqlite") else {})
-    Base.metadata.create_all(_engine)
     _Session = sessionmaker(_engine, expire_on_commit=False)
+    migrate(url)
+    drift = schema_drift(_engine)
+    if drift:
+        raise RuntimeError("database schema does not match the models after migration: " + "; ".join(drift))
+
+
+def migrate(url: str) -> None:
+    """Bring the database to the latest Alembic revision (the single source of schema truth)."""
+    from pathlib import Path
+
+    from alembic import command
+    from alembic.config import Config
+    root = Path(__file__).resolve().parents[2]
+    cfg = Config(str(root / "alembic.ini"))
+    cfg.set_main_option("script_location", str(root / "migrations"))
+    cfg.attributes["url"] = url
+    command.upgrade(cfg, "head")
+
+
+def schema_drift(engine) -> list[str]:
+    """Columns/tables the models expect but the live database lacks (the cause of the original booking 500)."""
+    from sqlalchemy import inspect
+    insp, problems = inspect(engine), []
+    have = set(insp.get_table_names())
+    for t in Base.metadata.sorted_tables:
+        if t.name not in have:
+            problems.append(f"missing table {t.name}")
+            continue
+        cols = {c["name"] for c in insp.get_columns(t.name)}
+        problems += [f"{t.name}.{c.name} missing" for c in t.columns if c.name not in cols]
+    return problems
 
 
 @contextmanager

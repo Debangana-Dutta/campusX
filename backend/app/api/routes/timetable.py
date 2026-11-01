@@ -45,7 +45,7 @@ def generate(body: GenerateIn, user: User = Depends(require_roles("admin"))):
         notify.notify("role:admin", f"New timetable generated (solver {out['status']}, validator "
                       f"{'accepted' if out.get('accepted') else 'REJECTED'}). Review and approve it.", "timetable", "/app/generate")
         if STATE.exams:
-            notify.notify("*", "The exam timetable has been published.", "exam", "/app/exams")
+            notify.notify("role:admin", "A draft exam timetable was generated. Review it and publish it from Exams.", "exam", "/app/exams", sender=user.id)
     if not out["ok"]:
         raise HTTPException(422, {"message": "no feasible timetable was produced", **{k: out.get(k) for k in ("status", "diagnosis")}})
     return out

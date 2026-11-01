@@ -18,7 +18,10 @@ from app.services.dataset.loader import Dataset, apply_disruption
 from app.services.scheduling.scoring import soft_penalties
 from app.services.scheduling.solver import Assignment, SolveResult, build_candidates, solve_timetable
 
-MOVE_WEIGHT = 1000
+# Soft penalty is bounded well below this (<= groups*days*periods gaps + small terms), so movement strictly dominates:
+# the objective is lexicographic (fewest moved sessions first, then lowest soft penalty).
+MOVE_WEIGHT = 100_000
+TIME_WEIGHT = 100   # secondary: room-only moves preferred over time-slot moves (max 190*100 < MOVE_WEIGHT)
 
 
 @dataclass
@@ -36,6 +39,7 @@ class RepairResult:
     soft: dict[str, int] = field(default_factory=dict)
     conflict: dict[str, Any] = field(default_factory=dict)
     stats: dict[str, Any] = field(default_factory=dict)
+    evidence: dict[str, Any] = field(default_factory=dict)
     wall_time_s: float = 0.0
 
 
@@ -91,7 +95,7 @@ def repair_timetable(raw: dict[str, Any], disruption: dict[str, Any], baseline: 
     # level 1: only affected + added sessions may move
     l1_budget = max(20, int(time_limit_s * 0.35))
     r1 = solve_timetable(new_ds, seed=seed, time_limit_s=l1_budget, workers=workers, baseline=base_kept,
-                         move_weight=MOVE_WEIGHT, pinned=pinned, feasibility_share=0.5)
+                         move_weight=MOVE_WEIGHT, time_move_weight=TIME_WEIGHT, pinned=pinned, feasibility_share=0.5)
     best: SolveResult | None = r1 if r1.has_solution else None
     stats = {"level1_status": r1.status, "level1_moved": r1.moved, "level1_time_s": round(r1.wall_time_s, 1)}
     upper = (r1.moved if r1.has_solution else None)
@@ -99,9 +103,9 @@ def repair_timetable(raw: dict[str, Any], disruption: dict[str, Any], baseline: 
 
     # level 2: free everything, objective = movement then soft, bounded by level 1
     remaining = time_limit_s - (time.time() - t0)
-    if remaining > 15 and not (best and best.status == "OPTIMAL" and best.moved == must_move):
+    if remaining > 5:
         r2 = solve_timetable(new_ds, seed=seed, time_limit_s=int(remaining), workers=workers, baseline=base_kept,
-                             move_weight=MOVE_WEIGHT, hint=(best.assignment if best else None),
+                             move_weight=MOVE_WEIGHT, time_move_weight=TIME_WEIGHT, hint=(best.assignment if best else None),
                              max_moved=upper, feasibility_share=0.3)
         stats.update(level2_status=r2.status, level2_moved=r2.moved, level2_time_s=round(r2.wall_time_s, 1))
         if r2.has_solution and (best is None or (r2.moved or 0) <= (best.moved or 0)):
@@ -134,13 +138,24 @@ def repair_timetable(raw: dict[str, Any], disruption: dict[str, Any], baseline: 
               "reason": "new session added by the change"} for sid in added_ids if sid in assign]
     n_moved = len(moved)
     forced = len([sid for sid in affected if sid in assign])
-    if best.status == "OPTIMAL" and (stats.get("level2_status") == "OPTIMAL" or n_moved == forced):
-        minimality = (f"Proven minimum: {n_moved} existing session(s) moved"
-                      + (" (every moved session was directly invalidated by the change)." if n_moved == forced else "."))
+    final = best                       # the solve that produced the schedule
+    full = stats.get("level2_status")
+    proven = bool(final.status == "OPTIMAL" and (full == "OPTIMAL" or stats.get("level1_status") == "OPTIMAL" and not (final is not None and full)))
+    # "proven" needs a solve over the FULL model (everything may move) that CP-SAT closed as OPTIMAL.
+    proven = full == "OPTIMAL" and best.status == "OPTIMAL"
+    time_changed = sum(1 for m in moved if m["time_changed"])
+    evidence = {
+        "method": "CP-SAT, objective = 100000 x (sessions whose day/period/room changed) + 100 x (of those, time-slot changes) + soft penalty; every session free to move",
+        "solver_status": best.status, "full_model_status": full, "level1_status": stats.get("level1_status"),
+        "objective": best.objective, "best_bound": best.best_bound, "moved_total": n_moved,
+        "time_slot_changes": time_changed, "room_only_changes": n_moved - time_changed, "unchanged": len(unchanged),
+        "directly_invalidated_lower_bound": forced, "proven_minimum": proven,
+    }
+    if proven:
+        minimality = (f"Proven minimum: CP-SAT closed the full model as OPTIMAL (objective {best.objective:.0f} = bound {best.best_bound:.0f}); "
+                      f"no valid timetable moves fewer than {n_moved} session(s) ({time_changed} time-slot, {n_moved - time_changed} room-only).")
     else:
-        minimality = (f"{n_moved} existing session(s) moved; solver status {best.status}, so this is the best found "
-                      f"within the time limit, not proven minimal." if n_moved > forced else
-                      f"{n_moved} moved = the {forced} session(s) the change directly invalidated (lower bound), "
-                      f"so no schedule can move fewer.")
+        minimality = (f"{n_moved} session(s) moved ({time_changed} time-slot, {n_moved - time_changed} room-only); solver status {best.status} "
+                      f"({forced} were directly invalidated). Not proven minimal within the time limit.")
     return RepairResult(best.status, True, new_raw, assign, moved, unchanged, added, removed, affected, minimality,
-                        soft_penalties(new_ds, assign), {}, stats, time.time() - t0)
+                        soft_penalties(new_ds, assign), {}, stats, evidence, time.time() - t0)

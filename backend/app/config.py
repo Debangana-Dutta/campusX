@@ -47,6 +47,18 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
 
+    # --- accounts / email
+    app_env: str = "development"          # "production" disables dev conveniences (token logging, default-password seeding)
+    seed_demo_users: bool = True          # create the demo accounts if the users table is empty
+    frontend_url: str = "http://localhost:5173"   # used to build password-reset links
+    allowed_email_domains: str = ""       # comma separated, e.g. "cit.ac.in"; empty = any valid address
+    reset_token_ttl_min: int = 30
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "OptiCampus <no-reply@opticampus.local>"
+
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:5173"
 
