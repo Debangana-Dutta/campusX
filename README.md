@@ -1,92 +1,608 @@
-# OptiCampus
+# OptiCampus | Smart Campus Scheduling & Venue Management Platform
 
-Timetables, room booking and exams for campus (built for the CIT "Crunch Week" hackathon).
-Backend code makes every scheduling and booking decision; AI only helps read requests and answer questions.
+**One Campus. Smarter Spaces. Seamless Scheduling.**
 
-## What it does
-- **Timetable**: OR-Tools CP-SAT places all 189 sessions (day, period, room) under every hard constraint and minimises the official soft penalties.
-- **Official validator**: the organisers' `validator.py` (unmodified) is run as a separate process. Nothing is approved or exported unless it reports 0 hard violations.
-- **Room booking**: request in English or Hinglish, review/edit the parsed form, submit. A deterministic engine applies the official priority order and role caps and records a reason for every decision.
-- **Schedule changes**: faculty leave, closed rooms, new sessions. The system proposes the fewest moves with solver evidence, shows exactly what changes, and only an Admin can apply or reject it.
-- **Exams**: 41 midsems at half room capacity, multi-room, no clashes.
-- **Manual scheduling** (same checks as automatic), **Admin data management** (rooms, faculty, groups, courses, sessions; import/export), **notifications**, **FAQs**, floating **Campus Buddy**.
+OptiCampus is a smart campus scheduling and venue management platform designed to simplify academic timetable coordination, room reservations, event planning, and institutional resource management. It provides a centralised system where administrators, faculty members, department coordinators, club representatives, and students can manage campus activities through a structured, role-based interface.
 
-## Verified results (official validator CLI)
-| Item | Result |
+Instead of depending on spreadsheets, phone calls, and scattered WhatsApp conversations, OptiCampus brings campus scheduling and venue coordination into one accessible platform.
+
+<p align="center">
+  <a href="https://campusx-pink.vercel.app/">
+    <img src="https://img.shields.io/badge/Live%20Demo-Visit%20OptiCampus-ec4899?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo"/>
+  </a>
+  <a href="https://github.com/Debangana-Dutta/OptiCampus">
+    <img src="https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Repository"/>
+  </a>
+  <a href="https://campus-x-api-8o6d.onrender.com/docs">
+    <img src="https://img.shields.io/badge/API-Swagger%20Docs-85C1A5?style=for-the-badge&logo=fastapi&logoColor=white" alt="API Documentation"/>
+  </a>
+</p>
+
+---
+
+## Table of Contents
+
+- [Project Overview](#-project-overview)
+- [Problem Statement](#-problem-statement)
+- [Our Solution](#-our-solution)
+- [Key Features](#-key-features)
+- [User Roles and Access](#-user-roles-and-access)
+- [Demo Access](#-demo-access)
+- [Admin Dashboard Workflow](#-admin-dashboard-workflow)
+- [System Architecture](#-system-architecture)
+- [Technology Stack](#-technology-stack)
+- [Application Workflow](#-application-workflow)
+- [Database and Backend](#-database-and-backend)
+- [Project Structure](#-project-structure)
+- [Getting Started](#-getting-started)
+- [Environment Configuration](#-environment-configuration)
+- [Deployment](#-deployment)
+- [Security Considerations](#-security-considerations)
+- [Testing and Verification](#-testing-and-verification)
+- [Future Enhancements](#-future-enhancements)
+- [Hackathon Context](#-hackathon-context)
+- [Project Links](#-project-links)
+
+---
+
+## 🎯 Project Overview
+
+OptiCampus addresses the everyday scheduling and venue coordination challenges faced by educational institutions.
+
+In a typical campus environment, multiple departments, faculty members, student clubs, and administrative teams need access to shared spaces. Managing these requirements through disconnected spreadsheets and informal communication channels makes it difficult to maintain an accurate overview of campus resources.
+
+OptiCampus provides a unified platform that supports:
+
+- Centralised campus scheduling.
+- Venue and room coordination.
+- Structured access requests.
+- Administrator-led account approval.
+- Role-based access control.
+- A consistent interface for different campus stakeholders.
+- Better visibility into institutional scheduling activities.
+
+The platform is designed around the needs of a college environment, with an emphasis on usability, clarity, accessibility, and efficient coordination.
+
+## ⚠️ Problem Statement
+
+Educational institutions frequently manage academic timetables, classrooms, laboratories, meeting spaces, and extracurricular events using separate spreadsheets, phone calls, and messaging applications.
+
+This creates several challenges:
+
+1. **Scheduling conflicts:** Multiple users may request the same venue for overlapping time slots.
+2. **Fragmented communication:** Important booking information is distributed across different channels.
+3. **Lack of centralisation:** Administrators may not have a single, reliable view of room availability and reservations.
+4. **Manual approval processes:** Faculty and student representatives may need to contact administrators individually for access.
+5. **Limited transparency:** Users may find it difficult to track the status of their requests.
+6. **Administrative overhead:** Repeated manual coordination consumes time that could be used for other institutional activities.
+
+These problems become particularly noticeable during examination periods, placement activities, college festivals, workshops, and other high-demand campus events.
+
+## 💡 Our Solution
+
+OptiCampus brings campus scheduling and venue management into a single web-based platform.
+
+The system provides different experiences based on the user's assigned role. Users can access the functionality relevant to their responsibilities, while administrators retain control over account approvals and platform management.
+
+The platform aims to make campus coordination more organised by replacing fragmented communication with a structured digital workflow.
+
+### Core Objectives
+
+- Reduce the possibility of scheduling and venue conflicts.
+- Make campus resource coordination easier to understand.
+- Simplify the process of requesting platform access.
+- Provide administrators with a centralised management interface.
+- Ensure that users access functionality according to their assigned roles.
+- Build a foundation that can be extended for larger institutional requirements.
+
+---
+
+## ✨ Key Features
+
+### 1. Centralised Campus Scheduling
+
+A unified scheduling experience helps campus stakeholders coordinate academic and extracurricular activities.
+
+- Organised scheduling information.
+- Improved visibility into campus activities.
+- A central location for scheduling-related operations.
+- A foundation for reducing overlapping reservations.
+
+### 2. Venue Management
+
+OptiCampus is designed to support the coordination of shared institutional spaces.
+
+- Centralised venue-related information.
+- Structured venue booking workflows.
+- Better visibility into resource allocation.
+- Support for academic and extracurricular requirements.
+
+### 3. Role-Based Access Control
+
+Different campus stakeholders require different levels of access. OptiCampus uses role-based access to separate administrative and user-facing functionality.
+
+- Administrator access for platform management.
+- Faculty access for academic activities.
+- Department coordinator access for departmental coordination.
+- Club representative access for extracurricular activities.
+- Student access for student-facing functionality.
+
+### 4. Account Access Requests
+
+New users can request access to the platform through a structured registration workflow.
+
+- Users submit their account details.
+- Requests are stored for administrator review.
+- Pending requests can be reviewed through User Management.
+- Administrators can approve or reject submitted requests.
+
+### 5. Administrator Dashboard
+
+The administrator dashboard provides a centralised management interface.
+
+- Review account requests.
+- Inspect submitted user details.
+- Approve or reject eligible requests.
+- Manage platform access.
+- Monitor administrative workflows.
+
+### 6. Modern User Experience
+
+The interface is designed to make the platform approachable and easy to navigate.
+
+- Clear navigation.
+- Consistent visual components.
+- Structured information presentation.
+- Responsive web interface.
+- Role-oriented user journeys.
+
+---
+
+## 👥 User Roles and Access
+
+OptiCampus supports multiple user categories, each with a distinct purpose within the campus ecosystem.
+
+| Role | Responsibility |
 |---|---|
-| `exports/schedule.json` | 0 hard violations · soft penalty 3 (CP-SAT OPTIMAL) · booking score 67/70 · 0 priority inversions · exam penalty 0 |
-| `exports/schedule_after.json` (sample disruption) | 0 hard violations · 12 sessions moved: **1 time-slot change, 11 room-only** · 177 unchanged · proven minimum (objective = bound) |
-Reproduce: `cd source_files/extracted/CrunchWeek_StarterPack && python validator.py --data data/cit_public.json --schedule ../../../exports/schedule.json`
-Test counts and the honest requirement-by-requirement status: `IMPLEMENTATION_STATUS.md` and `docs/REQUIREMENTS_AUDIT.md`.
+| Administrator | Manages the platform and reviews access requests. |
+| Faculty | Uses the platform for faculty-related academic activities. |
+| Department Coordinator | Supports departmental coordination and scheduling. |
+| Club Representative | Coordinates club-related activities and venue requirements. |
+| Student | Accesses student-facing platform functionality. |
 
-## Architecture
-```
- React + Vite + Tailwind (frontend/) ──HTTPS──> FastAPI (backend/app)
-   role-based routes, floating Campus Buddy         ├─ api/routes      thin HTTP layer, backend authorisation on every endpoint
-                                                    ├─ services/accounts      scrypt hashing, sign-in, access requests, password reset
-                                                    ├─ services/scheduling    CP-SAT model + soft-score mirror
-                                                    ├─ services/validation    official validator.py via subprocess
-                                                    ├─ services/bookings      deterministic engine, week state, displacement
-                                                    ├─ services/exams | disruptions | ai (Gemini client, parser, explain, Buddy)
-                                                    └─ SQLAlchemy + Alembic ── SQLite (local) / PostgreSQL (production)
- Official starter pack: source_files/ (preserved, never modified)
-```
-Stack: Python 3.12, FastAPI, Pydantic, SQLAlchemy, Alembic, OR-Tools; React 18, Vite 5, Tailwind 3, React Router, Recharts, Lucide, Inter (bundled).
+Access is organised around the user's assigned role. Administrative functionality is reserved for authorised administrator accounts.
 
-## Setup
-```
-python3 -m venv .venv && . .venv/bin/activate
-pip install -r backend/requirements.txt
-cd backend && PYTHONPATH=. uvicorn app.main:app --port 8000      # migrates the database on start; docs at /docs
-# second terminal
-cd frontend && npm ci && npm run dev                             # http://localhost:5173
-```
-**Database**: SQLite file by default (`backend/var/campusx.db`). For PostgreSQL set `DATABASE_URL=postgresql+psycopg2://...`; the app runs `alembic upgrade head` at startup and refuses to start if the schema does not match the models.
-**First start**: demo accounts are created if the users table is empty, and `exports/schedule.json` is loaded (re-validated by the official validator) as the starting timetable. Live changes are never overwritten on restart; the Admin *Settings -> Reset demo data* button restores the clean state (Admin only).
-**Create a real Admin** (Admin cannot self-register): `CREATE_ADMIN_PASSWORD='...' python scripts/create_admin.py --email dean@college.edu --name "Dean's Office"`.
-**Logo**: the supplied OptiCampus emblem is used everywhere (sidebar, landing, sign-in pages, favicon). The untouched original is `docs/branding/OptiCampus_Academic_Emblem.original.png`; the app serves a 512 px copy of the same artwork at `frontend/src/assets/logo.png` (replace that file to change the logo). It sits in a round white badge so it reads correctly in dark mode.
-Regenerate exports: `python scripts/generate_exports.py timetable --time 240` (repeat to improve) then `python scripts/generate_exports.py export` (writes only if the validator accepts).
+---
 
-## Run locally on Windows (PowerShell)
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r backend\requirements.txt
-cd backend
-$env:PYTHONPATH = "."
-uvicorn app.main:app --port 8000          # leave running; API docs at http://localhost:8000/docs
+## 🔐 Demo Access
+
+The following demo account is provided for evaluating the administrator workflow.
+
+| Field | Demo credentials |
+|---|---|
+| Role | Administrator |
+| Email / Username | `admin@opticampus.demo` |
+| Password | `campusx-demo` |
+
+### Admin Dashboard Workflow
+
+After signing in, evaluators can:
+
+1. Access the administrator dashboard.
+2. Navigate to **User Management**.
+3. Review pending faculty and department coordinator access requests.
+4. Inspect submitted account details.
+5. Approve or reject requests.
+6. Verify role-based access after approval.
+
+**Important:** Demo credentials are intended only for controlled evaluation. Do not reuse demo credentials for production or real institutional data.
+
+---
+
+## 🏗️ System Architecture
+
+OptiCampus follows a frontend-backend architecture.
+
+The frontend communicates with a backend API, which handles application logic, authentication-related operations, and database interactions.
+
+```mermaid
+flowchart TD
+    A["OptiCampus Web Application"] --> B["Frontend Interface"]
+    B --> C["Backend API - FastAPI"]
+    C --> D["Authentication and Role Management"]
+    C --> E["Application Services"]
+    E --> F["PostgreSQL Database"]
+    C --> G["API Documentation"]
+    H["Administrator / Faculty / Coordinator / Club Representative / Student"] --> A
 ```
-Second PowerShell window:
-```powershell
+
+### Architecture Components
+
+| Component | Purpose |
+|---|---|
+| Frontend | Provides the user interface and communicates with the API. |
+| Backend API | Handles application requests and business logic. |
+| Authentication and role management | Supports account authentication and role-based access workflows. |
+| Application services | Organise the platform's core operations. |
+| PostgreSQL | Stores application data. |
+| API documentation | Provides an interface for exploring available API endpoints. |
+
+---
+
+## 🛠️ Technology Stack
+
+The application uses a modern web development stack.
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| Frontend | React | Component-based user interface |
+| Build Tool | Vite | Frontend development and production builds |
+| Backend | Python | Backend application logic |
+| API Framework | FastAPI | REST API development |
+| Database | PostgreSQL | Persistent application data |
+| ORM | SQLAlchemy | Database interaction |
+| Database Migrations | Alembic | Database schema migration management |
+| API Documentation | OpenAPI / Swagger UI | API exploration and testing |
+| Frontend Hosting | Vercel | Frontend deployment |
+| Backend Hosting | Render | Backend deployment and hosting |
+| Version Control | Git and GitHub | Source code management |
+
+---
+
+## 🔄 Application Workflow
+
+### 1. User Access
+
+A user opens the OptiCampus application and accesses the available login or access-request functionality.
+
+### 2. Authentication
+
+The user signs in using the appropriate account credentials.
+
+### 3. Role-Based Navigation
+
+The application provides access according to the user's assigned role.
+
+### 4. Administrative Review
+
+When a new faculty member or department coordinator requests access, the request can be reviewed by an administrator through User Management.
+
+### 5. Approval or Rejection
+
+The administrator reviews the submitted details and makes an approval decision.
+
+### 6. Access Verification
+
+Following approval, the account's assigned role determines the functionality available to the user.
+
+---
+
+## 🗄️ Database and Backend
+
+The backend is built using FastAPI and PostgreSQL.
+
+### Backend Responsibilities
+
+- Handle frontend API requests.
+- Process account access requests.
+- Support authentication-related operations.
+- Manage role-based account information.
+- Communicate with the PostgreSQL database.
+- Expose API documentation through Swagger UI.
+
+### Database
+
+PostgreSQL is used as the persistent data store.
+
+SQLAlchemy provides the application's database interaction layer, while Alembic supports database schema migrations.
+
+### API Documentation
+
+The deployed backend provides interactive API documentation:
+
+**[Open OptiCampus API Documentation](https://campus-x-api-8o6d.onrender.com/docs)**
+
+The documentation can be used to explore available endpoints and inspect their request and response formats.
+
+---
+
+## 📁 Project Structure
+
+The following is a representative overview of how the application is organised. Refer to the repository for the exact current file and folder structure.
+
+```text
+OptiCampus/
+│
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── assets/
+│   │   ├── services/
+│   │   └── ...
+│   ├── package.json
+│   └── ...
+│
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   ├── models/
+│   │   ├── schemas/
+│   │   ├── services/
+│   │   └── ...
+│   ├── alembic/
+│   ├── requirements.txt
+│   └── ...
+│
+└── README.md
+```
+
+---
+
+## 🚀 Getting Started
+
+Follow these steps to run the project locally.
+
+### Prerequisites
+
+Make sure the following tools are installed:
+
+- Git
+- Node.js and npm
+- Python
+- PostgreSQL
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/Debangana-Dutta/OptiCampus.git
+cd OptiCampus
+```
+
+### 2. Set Up the Frontend
+
+Navigate to the frontend directory:
+
+```bash
 cd frontend
-npm ci
-npm run dev                                # http://localhost:5173
 ```
-Tests: backend `cd <repo root>; $env:PYTHONPATH=""; pytest` · frontend (needs the backend above running) `cd frontend; $env:VITE_API_BASE_URL="http://localhost:8000"; npx vitest run` · build `npm run build` · contrast `python scripts\contrast_check.py`.
 
-## 5-minute demo script
-1. Open the site: a 1-second glass splash (logo + name) pulls down to reveal the login page. Sign in as `admin@opticampus.demo`. 2. **Timetable Generator** -> run -> see the official validator verdict -> **Approve**. 3. **Exams** -> Publish. 4. Sign in as `student@opticampus.demo`, open the floating **Campus Buddy**, tap *When is my midsem?* (and *Exam kab hai?*). 5. As `club@opticampus.demo` -> **Request a Venue**: type *Need a room for 45 people on Tuesday 6 to 8 pm, projector please*, edit, submit; then request the same auditorium slot as BR-01 (Mon P4-5) to see a blocked conflict with an alternative. 6. As `faculty@opticampus.demo` -> **Schedule Assistant**: *I am unavailable on <a teaching day> because of a conference* -> review options -> Submit. 7. Back as admin -> **Schedule Changes** -> Review the request -> Approve (or Reject); timetable changes only now. 8. Show **Notifications** for each role and the admin **Overview**.
+Install dependencies:
 
-## Demo accounts (seeded; password = `DEMO_PASSWORD`, default `campusx-demo` for local use only)
-| Email | Role |
+```bash
+npm install
+```
+
+Configure the frontend environment variables as described in the Environment Configuration section.
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+### 3. Set Up the Backend
+
+Open another terminal and navigate to the backend directory:
+
+```bash
+cd backend
+```
+
+Create a virtual environment:
+
+```bash
+python -m venv venv
+```
+
+Activate it on Windows:
+
+```powershell
+.\venv\Scripts\Activate.ps1
+```
+
+Activate it on macOS or Linux:
+
+```bash
+source venv/bin/activate
+```
+
+Install the backend dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Configure the backend environment variables and database connection.
+
+Start the backend using the project's configured ASGI application entry point. For example, if the application entry point is `app.main:app`:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+The exact commands and directory names should be checked against the current repository configuration.
+
+---
+
+## ⚙️ Environment Configuration
+
+The application uses environment variables to separate configuration from source code.
+
+### Frontend
+
+Example:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+For the deployed frontend, the API base URL is configured as:
+
+```env
+VITE_API_BASE_URL=https://campus-x-api-8o6d.onrender.com
+```
+
+The frontend application appends its API path internally, so the base URL should not include an additional `/api` suffix.
+
+### Backend
+
+The backend requires environment-specific configuration for database connectivity, authentication, CORS, and optional demo account seeding.
+
+Typical configuration categories include:
+
+```env
+DATABASE_URL=your_database_connection_string
+CORS_ORIGINS=your_frontend_origin
+FRONTEND_URL=your_frontend_url
+LOCAL_AUTH_SECRET=your_unique_secret
+```
+
+If demo account seeding is enabled in a controlled evaluation environment, configure the required demo-seeding variables according to the backend implementation.
+
+**Never commit real database credentials, authentication secrets, private keys, or production passwords to GitHub.**
+
+---
+
+## ☁️ Deployment
+
+OptiCampus is deployed using Vercel, Render, and PostgreSQL.
+
+| Service | Deployment |
 |---|---|
-| `admin@opticampus.demo` | Admin (Dean's Office) |
-| `coordinator@opticampus.demo` | Department Coordinator (CSE) |
-| `faculty@opticampus.demo` | Faculty (F01) |
-| `club@opticampus.demo` | Club Representative |
-| `student@opticampus.demo` | Read-only student view (not an approval role) |
-These are **not shown on the sign-in page**. For any shared deployment set `DEMO_PASSWORD` and `LOCAL_AUTH_SECRET`; with `APP_ENV=production` the app refuses to seed demo accounts using the old default password.
+| Frontend | [OptiCampus Live Application](https://campusx-pink.vercel.app/) |
+| Backend | [OptiCampus API](https://campus-x-api-8o6d.onrender.com) |
+| API Documentation | [Swagger UI](https://campus-x-api-8o6d.onrender.com/docs) |
+| Database | PostgreSQL hosted through Render |
 
-## Authentication
-Sign in (email + password, show/hide, remember me) · Request access (Faculty / Department Coordinator / Club Representative only; Admin cannot be requested; pending until an Admin approves) · Forgot/reset password (single-use, 30-minute token stored hashed; identical response for any email; sent by SMTP, or in development logged to the server console only) · Change password in Settings. Roles are enforced in the backend.
+### Frontend Deployment
 
-## Environment variables
-See `.env.example` (backend) and `frontend/.env.example` (`VITE_API_BASE_URL`). Secrets are backend-only.
+The frontend is hosted on Vercel.
 
-## Deployment (prepared, NOT performed)
-- **Render (API)**: `render.yaml`; health check `/api/health`. Set `DATABASE_URL` (PostgreSQL), `LOCAL_AUTH_SECRET`, `DEMO_PASSWORD`, `CORS_ORIGINS`, `FRONTEND_URL`, optional `SMTP_*`, `GEMINI_API_KEY`; create the Admin with `scripts/create_admin.py`.
-- **Vercel (web)**: root `frontend`, `VITE_API_BASE_URL=https://<service>.onrender.com`; `vercel.json` handles routing.
-- Never commit real keys, database passwords or secrets.
+The deployment uses the configured API base URL to communicate with the backend service.
 
-## Known limitations
-See `IMPLEMENTATION_STATUS.md`. Headlines: pages were never viewed in a real browser; PostgreSQL, SMTP and live Gemini were not exercised; nothing is deployed; the dataset is loaded from the official JSON (admin edits persist as a database snapshot, not normalised tables).
+### Backend Deployment
+
+The backend is hosted on Render.
+
+The service handles API requests and connects to the configured PostgreSQL database.
+
+### Database Deployment
+
+PostgreSQL provides persistent storage for the application.
+
+Environment-specific database configuration is maintained through the hosting provider rather than committed to the source repository.
+
+---
+
+## 🔒 Security Considerations
+
+OptiCampus includes role-oriented access workflows and administrator-controlled account approval.
+
+Important considerations for real institutional deployment include:
+
+- Use unique and strong authentication secrets.
+- Do not expose administrator passwords in public repositories.
+- Keep database credentials in protected environment variables.
+- Restrict administrative functionality to authorised users.
+- Configure trusted frontend origins for cross-origin requests.
+- Replace demo authentication settings with institution-ready authentication before production use.
+- Use secure password handling and appropriate session management.
+- Apply suitable access controls to institutional data.
+
+The demo environment is intended for evaluation and demonstration. It should not be treated as a production-ready deployment for confidential institutional information without additional security review.
+
+---
+
+## 🧪 Testing and Verification
+
+The application can be evaluated through the deployed frontend and backend API documentation.
+
+Suggested evaluation checklist:
+
+- [ ] Open the live OptiCampus application.
+- [ ] Verify that the frontend loads successfully.
+- [ ] Sign in using the administrator demo account.
+- [ ] Open the administrator dashboard.
+- [ ] Navigate to User Management.
+- [ ] Review pending faculty access requests.
+- [ ] Review pending department coordinator access requests.
+- [ ] Approve or reject a request.
+- [ ] Verify the resulting account access and role-based navigation.
+- [ ] Open the Swagger API documentation.
+- [ ] Inspect the available API endpoints.
+
+---
+
+## 🔮 Future Enhancements
+
+OptiCampus provides a foundation that can be extended with additional campus management capabilities.
+
+### Intelligent Scheduling
+
+- Automated timetable generation.
+- Conflict detection for overlapping reservations.
+- Availability-based venue recommendations.
+- Scheduling optimisation based on institutional constraints.
+
+### Enhanced Venue Management
+
+- Interactive campus venue directory.
+- Room capacity and equipment information.
+- Real-time booking status.
+- Calendar-based venue availability.
+
+### Notifications and Communication
+
+- Automated booking confirmations.
+- Approval and rejection notifications.
+- Scheduling reminders.
+- Updates for modified or cancelled reservations.
+
+### Analytics and Reporting
+
+- Venue utilisation reports.
+- Department-wise scheduling insights.
+- Booking activity summaries.
+- Administrative dashboards with usage analytics.
+
+### Institutional Integration
+
+- Integration with existing academic timetables.
+- Institutional single sign-on.
+- Calendar integrations.
+- Support for larger multi-department campus environments.
+
+These enhancements represent possible future development directions and are not claims of currently implemented functionality.
+
+---
+
+## 🏆 Hackathon Context
+
+**Event:** Tech Zephyr  
+**Institution:** IIT Bhubaneswar  
+**Track:** Web Development  
+**Problem Category:** Campus Scheduling and Venue Management
+
+OptiCampus was developed as a solution to the challenges of campus scheduling, shared venue coordination, and administrative access management.
+
+The project focuses on building a practical and accessible platform that can help educational institutions organise their campus operations more efficiently.
+
+---
+
+## 📌 Project Links
+
+| Resource | Link |
+|---|---|
+| Live Application | [OptiCampus](https://campusx-pink.vercel.app/) |
+| GitHub Repository | [OptiCampus Repository](https://github.com/Debangana-Dutta/OptiCampus) |
+| Backend API | [OptiCampus API](https://campus-x-api-8o6d.onrender.com) |
+| API Documentation | [Swagger UI](https://campus-x-api-8o6d.onrender.com/docs) |
+
+---
+
+<p align="center">
+  <strong>OptiCampus</strong><br/>
+  One Campus. Smarter Spaces. Seamless Scheduling.
+</p>
