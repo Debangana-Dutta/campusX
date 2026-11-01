@@ -22,7 +22,7 @@ export default {
         bad: 'rgb(var(--bad) / <alpha-value>)',
       },
       borderRadius: { clay: '1.5rem', 'clay-sm': '1rem', 'clay-xs': '0.75rem' },
-      fontFamily: { sans: ['"Inter Variable"', 'Inter', 'system-ui', '"Segoe UI"', 'sans-serif'] },
+      fontFamily: { display: ['"Playfair Display Variable"', 'Playfair Display', 'Georgia', 'serif'], sans: ['"Inter Variable"', 'Inter', 'system-ui', '"Segoe UI"', 'sans-serif'] },
     },
   },
   plugins: [],

@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react
 import { Eye, EyeOff } from 'lucide-react'
 import { api } from '../services/api'
 import { Logo } from '../components/Logo'
+import BrandName from '../components/BrandName'
 import { Btn, Card, Field } from '../components/ui'
 import { useAuth, useToast } from '../contexts/AppContexts'
 
@@ -52,21 +53,32 @@ export function Login() {
     catch (ex) { setErr(ex.message) } finally { setBusy(false) }
   }
   return (
-    <Shell title="Sign in" subtitle="Use your OptiCampus account." footer={<>New here? <Link className="font-bold text-accent" to="/request-access">Request access</Link></>}>
-      <form onSubmit={submit} noValidate className="grid gap-4" aria-label="Sign in">
-        {expired && <Msg>Your session expired. Please sign in again.</Msg>}
-        <Field label="Email" id="email"><input id="email" className="field" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-        <div>
-          <PasswordInput id="password" value={password} onChange={setPassword} />
-          <div className="mt-2 flex items-center justify-between text-sm">
-            <label className="flex items-center gap-2 font-semibold text-navy"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />Remember me</label>
-            <Link to="/forgot-password" className="font-bold text-accent">Forgot password?</Link>
-          </div>
-        </div>
-        <Msg>{err}</Msg>
-        <Btn type="submit" variant="primary" loading={busy}>Sign in</Btn>
-      </form>
-    </Shell>
+    <div className="relative min-h-screen overflow-hidden">
+      <div aria-hidden className="pointer-events-none absolute -left-32 top-10 h-96 w-96 rounded-full bg-lavender/40 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -right-24 bottom-0 h-96 w-96 rounded-full bg-sky/40 blur-3xl" />
+      <div className="relative mx-auto grid min-h-screen max-w-7xl items-center gap-8 px-6 py-10 lg:grid-cols-2 lg:gap-16 lg:px-12">
+        <h1 className="text-center lg:text-left"><BrandName stacked className="text-[clamp(3.75rem,13vw,9.5rem)]" /></h1>
+        <main className="mx-auto w-full max-w-md">
+          <section className="glass rounded-3xl p-6 sm:p-8" aria-labelledby="signin-h">
+            <h2 id="signin-h" className="mb-5 text-2xl font-bold text-navy">Sign in</h2>
+            <form onSubmit={submit} noValidate className="grid gap-4" aria-label="Sign in">
+              {expired && <Msg>Your session expired. Please sign in again.</Msg>}
+              <Field label="Email" id="email"><input id="email" className="field" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+              <div>
+                <PasswordInput id="password" value={password} onChange={setPassword} />
+                <div className="mt-2 flex items-center justify-between text-sm">
+                  <label className="flex items-center gap-2 font-semibold text-navy"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />Remember me</label>
+                  <Link to="/forgot-password" className="font-bold text-accent">Forgot password?</Link>
+                </div>
+              </div>
+              <Msg>{err}</Msg>
+              <Btn type="submit" variant="primary" loading={busy}>Sign in</Btn>
+            </form>
+          </section>
+          <p className="mt-5 text-center text-sm text-muted">New here? <Link className="font-bold text-accent" to="/request-access">Request access</Link></p>
+        </main>
+      </div>
+    </div>
   )
 }
 

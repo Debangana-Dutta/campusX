@@ -22,8 +22,19 @@ def _build(user: User, text: str, choices):
         raise HTTPException(409, "no timetable yet")
     if not user.faculty_id:
         raise HTTPException(403, "your account is not linked to a faculty record")
-    return fa.build(STATE.live_raw, STATE.schedule(), STATE.assignment, STATE.exams, _confirmed(),
-                    STATE.outcome.session_overrides if STATE.outcome else [], user.faculty_id, text, choices)
+    try:
+        return fa.build(STATE.live_raw, STATE.schedule(), STATE.assignment, STATE.exams, _confirmed(),
+                        STATE.outcome.session_overrides if STATE.outcome else [], user.faculty_id, text, choices)
+    except fa.AssistantInputError as e:                  # caller-data problem, explained to the user (never a bare 500)
+        raise HTTPException(409, str(e)) from e
+
+
+def _choices(body: dict) -> dict[str, int]:
+    """Option picks from the client; malformed values are a 422, not a crash."""
+    try:
+        return {str(k): int(v) for k, v in (body.get("choices") or {}).items()}
+    except (TypeError, ValueError, AttributeError) as e:
+        raise HTTPException(422, "choices must map a session id to an option number") from e
 
 
 def _public(r: dict) -> dict:
@@ -39,7 +50,7 @@ def draft(body: dict, user: User = Depends(faculty)):
     text = str(body.get("text", "")).strip()
     if not (5 <= len(text) <= 600):
         raise HTTPException(422, "describe the change in 5-600 characters")
-    choices = {k: int(v) for k, v in (body.get("choices") or {}).items()}
+    choices = _choices(body)
     r = _build(user, text, choices)
     audit.record(user.id, "assistant.draft", "-", {"affected": len(r.get("alternatives", {})), "valid": bool(r.get("proposal") and r["proposal"]["feasible"])})
     # keep the older, simpler response keys for existing clients
@@ -54,7 +65,7 @@ def submit(body: dict, user: User = Depends(faculty)):
     text = str(body.get("text", "")).strip()
     if not (5 <= len(text) <= 600):
         raise HTTPException(422, "describe the change in 5-600 characters")
-    choices = {k: int(v) for k, v in (body.get("choices") or {}).items()}
+    choices = _choices(body)
     r = _build(user, text, choices)
     p = r.get("proposal")
     if not p or not p["feasible"]:

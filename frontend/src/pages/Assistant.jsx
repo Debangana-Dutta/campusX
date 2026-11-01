@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, Send } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Info, Send } from 'lucide-react'
 import { api } from '../services/api'
 import { useToast } from '../contexts/AppContexts'
 import { Btn, Card, Empty, PageHeader, Pill } from '../components/ui'
@@ -16,10 +16,11 @@ export default function Assistant() {
   const [choices, setChoices] = useState({})
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(null)
+  const [error, setError] = useState('')
 
   const run = async (t, ch = {}) => {
-    setBusy(true); setDone(null)
-    try { setRes(await api.assistantDraft(t, ch)); setSent(t); setChoices(ch) } catch (e) { toast(e.message, 'error') } finally { setBusy(false) }
+    setBusy(true); setDone(null); setError('')
+    try { setRes(await api.assistantDraft(t, ch)); setSent(t); setChoices(ch) } catch (e) { setRes(null); setError(e.message); toast(e.message, 'error') } finally { setBusy(false) }
   }
   const submit = async () => {
     setBusy(true)
@@ -41,9 +42,12 @@ export default function Assistant() {
         </Card>
 
         <div className="grid gap-5 lg:col-span-3">
-          {!res ? <Empty title="No request yet" hint="Describe a change and the assistant will show valid alternatives, or explain why none exist." /> : (
+          {error && <Card role="alert"><p className="mb-1 flex items-center gap-2 font-bold text-navy"><AlertTriangle className="h-5 w-5 text-warning" />The assistant could not process this request</p><p className="text-sm text-ink">{error}</p></Card>}
+          {!res && !error ? <Empty title="No request yet" hint="Describe a change and the assistant will show valid alternatives, or explain why none exist." /> : !res ? null : (
             <>
-              {res.follow_up?.length > 0 && <Card role="status"><p className="mb-1 font-bold text-navy">I need a bit more information</p><ul className="list-disc pl-5 text-sm text-ink">{res.follow_up.map((q) => <li key={q}>{q}</li>)}</ul></Card>}
+              {res.status === 'nothing_to_move' && <Card role="status"><p className="mb-1 flex items-center gap-2 font-bold text-navy"><Info className="h-5 w-5" />Nothing needs to move</p><p className="text-sm text-ink">{res.message}</p></Card>}
+              {res.status === 'not_supported' && <Card role="status"><p className="mb-1 flex items-center gap-2 font-bold text-navy"><Info className="h-5 w-5" />This assistant can't do that yet</p><p className="text-sm text-ink">{res.message}</p></Card>}
+              {res.status === 'needs_info' && res.follow_up?.length > 0 && <Card role="status"><p className="mb-1 font-bold text-navy">I need a bit more information</p><ul className="list-disc pl-5 text-sm text-ink">{res.follow_up.map((q) => <li key={q}>{q}</li>)}</ul></Card>}
               {Object.entries(res.alternatives || {}).map(([sid, alts]) => (
                 <Card key={sid}><h2 className="mb-2 text-lg font-bold text-navy">{sid}</h2>
                   <fieldset className="grid gap-2"><legend className="sr-only">Options for {sid}</legend>

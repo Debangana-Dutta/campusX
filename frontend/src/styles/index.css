@@ -11,6 +11,7 @@
   /* semantic tones: every tone is a bg + fg PAIR, tuned per theme (never reuse a background token as text) */
   --ok-bg: 209 240 227;   --ok-fg: 20 81 63;    --warn-bg: 255 226 205; --warn-fg: 107 58 20;  --bad-bg: 255 214 224; --bad-fg: 122 31 58;
   --info-bg: 214 224 255; --info-fg: 27 37 89;  --lav-bg: 222 214 255;  --lav-fg: 47 38 112;
+  --brand-a: 38 96 205; --brand-b: 118 72 214;
   --glass-bg: 255 255 255; --glass-a: .62; --glass-line: 255 255 255;
   --clay-top: #ffffff; --clay-bottom: #e8effb;
   --sh-dark: rgba(126, 144, 196, 0.34); --sh-light: rgba(255, 255, 255, 0.95);
@@ -23,6 +24,7 @@
   --accent: 160 148 255; --ok: 90 210 160; --warn: 245 180 90; --bad: 255 120 140;
   --ok-bg: 24 78 62;      --ok-fg: 140 240 192; --warn-bg: 96 64 30;    --warn-fg: 255 208 150; --bad-bg: 108 40 66;  --bad-fg: 255 176 196;
   --info-bg: 48 62 132;   --info-fg: 190 204 255; --lav-bg: 72 58 130;  --lav-fg: 220 206 255;
+  --brand-a: 126 178 255; --brand-b: 196 158 255;
   --glass-bg: 30 36 78; --glass-a: .58; --glass-line: 150 160 230;
   --clay-top: #2a3068; --clay-bottom: #1d2249;
   --sh-dark: rgba(5, 7, 22, 0.65); --sh-light: rgba(70, 82, 150, 0.30);
@@ -95,3 +97,20 @@ body {
 .dark { --c0: 74 62 130; --c1: 44 82 128; --c2: 44 100 82; --c3: 120 82 52; --c4: 120 60 88; --c5: 112 94 40; --c6: 60 72 140; --c7: 40 96 102; --c8: 94 64 126; --c9: 76 96 44; --c10: 122 70 58; --c11: 52 84 100; }
 .cc-0{background:rgb(var(--c0))}.cc-1{background:rgb(var(--c1))}.cc-2{background:rgb(var(--c2))}.cc-3{background:rgb(var(--c3))}.cc-4{background:rgb(var(--c4))}.cc-5{background:rgb(var(--c5))}
 .cc-6{background:rgb(var(--c6))}.cc-7{background:rgb(var(--c7))}.cc-8{background:rgb(var(--c8))}.cc-9{background:rgb(var(--c9))}.cc-10{background:rgb(var(--c10))}.cc-11{background:rgb(var(--c11))}
+
+/* ---- brand name (two-tone like the logo: navy "Opti" + blue-to-violet "Campus") */
+.brand-name { font-family: 'Playfair Display Variable', 'Playfair Display', Georgia, serif; font-weight: 700; letter-spacing: -0.02em; line-height: .95; }
+.brand-gradient { color: rgb(var(--brand-a)); background: linear-gradient(90deg, rgb(var(--brand-a)), rgb(var(--brand-b))); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+
+/* ---- splash: translucent glass curtain, holds ~1s then pulls DOWN and away to reveal the login page */
+.splash { position: fixed; inset: 0; z-index: 300; display: grid; place-items: center; overflow: hidden;
+  background: linear-gradient(135deg, rgb(var(--lav-bg) / .72), rgb(var(--sky) / .55));
+  transition: transform var(--splash-exit, 700ms) cubic-bezier(.7, 0, .25, 1), border-radius var(--splash-exit, 700ms) ease; }
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) { .splash { -webkit-backdrop-filter: blur(26px) saturate(1.5); backdrop-filter: blur(26px) saturate(1.5); } }
+.splash-leave { transform: translateY(104%); border-radius: 0 0 3rem 3rem; }
+.splash-card { display: grid; justify-items: center; gap: 1.25rem; padding: 2.5rem 3rem; border-radius: 2rem; text-align: center;
+  background: rgb(var(--glass-bg) / .38); border: 1px solid rgb(var(--glass-line) / .5);
+  box-shadow: 0 20px 60px var(--sh-dark), inset 0 1px 0 rgb(var(--glass-line) / .6); animation: splash-in .5s ease both; }
+@keyframes splash-in { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+.splash-orb { position: absolute; border-radius: 9999px; filter: blur(60px); opacity: .55; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .splash-leave { transform: none; opacity: 0; } }

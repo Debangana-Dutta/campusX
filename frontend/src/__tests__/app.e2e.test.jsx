@@ -3,7 +3,9 @@
 // jsdom cannot judge visual layout or colour; see IMPLEMENTATION_STATUS.md.
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { act } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import Splash from '../components/Splash'
 import App from '../App'
 import { AuthProvider, ThemeProvider, ToastProvider } from '../contexts/AppContexts'
 import { api, tokenStore } from '../services/api'
@@ -17,34 +19,67 @@ async function renderAs(role, path = '/app') {
 const nav = (name) => screen.findByRole('link', { name }, T)
 const type = (label, value) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
 
-describe('branding and public pages', () => {
-  it('landing page: required headline, description, CTAs that go to real routes, footer statement and copyright', async () => {
+describe('first page is the login page', () => {
+  it('"/" shows the sign-in page with the big brand name on the left and nothing describing the product', async () => {
     await renderAs(null, '/')
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Make Every Campus Hour Count.')
-    expect(screen.getByText('Smarter scheduling, seamless venue management and clash-free campus operations.')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: /Get Started/i })[0]).toHaveAttribute('href', '/request-access')
-    expect(screen.getAllByRole('link', { name: /Sign In/i })[0]).toHaveAttribute('href', '/login')
-    expect(screen.getByRole('link', { name: 'Explore Platform' })).toHaveAttribute('href', '#features')
-    expect(document.getElementById('features')).not.toBeNull()
-    for (const f of ['Intelligent timetable scheduling', 'Venue booking', 'Examination planning', 'Clash detection', 'Disruption management', 'Notifications']) expect(screen.getByText(f)).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'How it works' })).toBeInTheDocument()
-    expect(screen.getByText('Designed to make campus operations smarter, simpler and more connected.')).toBeInTheDocument()
-    expect(screen.getByText('© 2026 OptiCampus. All rights reserved.')).toBeInTheDocument()
-    expect(screen.queryByText(/Campus X|testimonial|AI-powered/i)).toBeNull()
-    expect(screen.queryByRole('link', { name: /admin|dashboard/i })).toBeNull()          // no privileged shortcuts when signed out
+    const h1 = screen.getByRole('heading', { level: 1 })
+    expect(h1).toHaveTextContent('OptiCampus')
+    expect(h1.querySelector('.brand-name')).not.toBeNull()
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Email')).toBeInTheDocument()
+    // layout: brand (h1) comes first, the form second (left, then right on wide screens)
+    expect(h1.compareDocumentPosition(screen.getByRole('main')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // no marketing / feature / how-it-works / footer copy anywhere
+    expect(screen.queryByText(/Make Every Campus Hour|features|how it works|Explore Platform|Designed to make campus|All rights reserved|timetable scheduling|Venue booking/i)).toBeNull()
+    expect(screen.queryByRole('link', { name: /Explore|Features/i })).toBeNull()
   })
-  it('landing is separate from the app: signed-in users see an Open dashboard link, not the dashboard itself', async () => {
+  it('"/login" is the same login page; Request access and Forgot password are reachable', async () => {
+    await renderAs(null, '/login')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('OptiCampus')
+    expect(screen.getByRole('link', { name: /Request access/i })).toHaveAttribute('href', '/request-access')
+    expect(screen.getByRole('link', { name: /Forgot password/i })).toHaveAttribute('href', '/forgot-password')
+  })
+  it('a signed-in user opening "/" goes straight to their dashboard, not the login page', async () => {
     await renderAs('student', '/')
-    expect(await screen.findByRole('link', { name: 'Open dashboard' }, T)).toHaveAttribute('href', '/app')
-    expect(screen.queryByText(/Needs your attention|Read-only view/i)).toBeNull()
-  })
-  it('landing Get Started leads to the request-access form, Sign In to the sign-in form', async () => {
-    await renderAs(null, '/request-access')
-    expect(await screen.findByRole('heading', { name: /Request access/i }, T)).toBeInTheDocument()
+    expect(await screen.findByText(/Read-only view for CSE-2/i, {}, T)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Email')).toBeNull()
   })
   it('protected routes redirect anonymous users to sign in', async () => {
     await renderAs(null, '/app/timetable')
     expect(await screen.findByRole('heading', { name: /Sign in/i }, T)).toBeInTheDocument()
+  })
+})
+
+describe('splash screen', () => {
+  it('shows only the logo and the name on a glass layer', () => {
+    const { container } = render(<Splash />)
+    const sp = screen.getByTestId('splash')
+    expect(sp).toHaveAttribute('data-phase', 'show')
+    expect(within(sp).getByRole('img', { name: 'OptiCampus logo', hidden: true })).toBeInTheDocument()
+    expect(sp.textContent.replace(/\s/g, '')).toBe('OptiCampus')                                  // nothing but the name
+    expect(sp.className).toMatch(/splash/)
+    expect(container.querySelector('.brand-gradient')).not.toBeNull()
+  })
+  it('holds for 1 second, then pulls down and away, then is removed (revealing the page under it)', () => {
+    vi.useFakeTimers()
+    try {
+      render(<Splash hold={1000} exit={700} />)
+      expect(screen.getByTestId('splash')).toHaveAttribute('data-phase', 'show')
+      act(() => { vi.advanceTimersByTime(999) })
+      expect(screen.getByTestId('splash')).toHaveAttribute('data-phase', 'show')               // still showing at 999 ms
+      act(() => { vi.advanceTimersByTime(2) })
+      const sp = screen.getByTestId('splash')
+      expect(sp).toHaveAttribute('data-phase', 'leaving')                                      // pull-down starts at 1 s
+      expect(sp.className).toMatch(/splash-leave/)
+      expect(sp.style.getPropertyValue('--splash-exit')).toBe('700ms')
+      act(() => { vi.advanceTimersByTime(700) })
+      expect(screen.queryByTestId('splash')).toBeNull()                                        // gone: login is revealed
+      expect(document.body.style.overflow).not.toBe('hidden')                                  // scrolling restored
+    } finally { vi.useRealTimers() }
+  })
+  it('is hidden from assistive tech and does not block the page for long', () => {
+    render(<Splash />)
+    expect(screen.getByTestId('splash')).toHaveAttribute('aria-hidden', 'true')
   })
 })
 
@@ -64,12 +99,11 @@ describe('theme tokens (dark-mode contrast fix)', () => {
 })
 
 describe('official logo', () => {
-  it('the supplied logo image is shown beside the OptiCampus heading on landing, sign in and inside the app', async () => {
-    const { unmount } = await renderAs(null, '/')
-    for (const img of screen.getAllByRole('img', { name: 'OptiCampus logo' })) expect(img.getAttribute('src')).toMatch(/logo.*\.png$|^data:image\/png/)
-    expect(screen.getAllByRole('img', { name: 'OptiCampus logo' })[0].parentElement.nextSibling).toHaveTextContent('OptiCampus')
-    unmount()
-    const l = await renderAs(null, '/login')
+  it('the supplied logo image is used on the splash, the auth pages and inside the app', async () => {
+    const sp = render(<Splash />)
+    expect(screen.getByRole('img', { name: 'OptiCampus logo', hidden: true }).getAttribute('src')).toMatch(/logo.*\.png$|^data:image\/png/)
+    sp.unmount()
+    const l = await renderAs(null, '/forgot-password')
     expect(screen.getByRole('img', { name: 'OptiCampus logo' })).toBeInTheDocument()
     l.unmount()
     await renderAs('student')
@@ -144,7 +178,7 @@ describe('authentication', () => {
     await renderAs('admin')
     fireEvent.click(await screen.findByRole('button', { name: /Dean's Office/i }, T))
     fireEvent.click(await screen.findByRole('menuitem', { name: /Sign out/i }))
-    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(/Make Every Campus Hour Count/i)
+    expect(await screen.findByRole('heading', { name: 'Sign in' }, T)).toBeInTheDocument()
     expect(tokenStore.get()).toBeNull()
   })
 })

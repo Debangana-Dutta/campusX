@@ -3,7 +3,6 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import Guard from './routes/Guard'
 import AppShell from './layouts/AppShell'
 import { LoadingBlock } from './components/ui'
-import Landing from './pages/Landing'
 import { ForgotPassword, Login, RequestAccess, ResetPassword } from './pages/Auth'
 import BuddyWidget from './features/BuddyWidget'
 
@@ -37,7 +36,7 @@ export default function App() {
   return (
     <Suspense fallback={<div className="p-8"><LoadingBlock /></div>}>
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />

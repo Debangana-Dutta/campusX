@@ -9,10 +9,16 @@ services:
     healthCheckPath: /api/health
     envVars:
       - { key: PYTHON_VERSION, value: 3.12.3 }
-      - { key: AUTH_MODE, value: local }          # set to "supabase" once Supabase Auth is configured
+      - { key: APP_ENV, value: production }
+      - { key: AUTH_MODE, value: local }
+      - { key: FRONTEND_URL, sync: false }        # https://your-app.vercel.app (reset links)
+      - { key: SMTP_HOST, sync: false }
+      - { key: SMTP_USER, sync: false }
+      - { key: SMTP_PASSWORD, sync: false }
+      - { key: SMTP_FROM, sync: false }
       - { key: CORS_ORIGINS, sync: false }        # e.g. https://your-app.vercel.app
       - { key: LOCAL_AUTH_SECRET, generateValue: true }
       - { key: DEMO_PASSWORD, sync: false }
-      - { key: DATABASE_URL, sync: false }        # Supabase Postgres URI (optional; SQLite is ephemeral on Render)
+      - { key: DATABASE_URL, sync: false }        # REQUIRED for persistence: PostgreSQL URI (SQLite is ephemeral on Render)
       - { key: SUPABASE_JWT_SECRET, sync: false }
       - { key: GEMINI_API_KEY, sync: false }      # optional; deterministic fallbacks work without it
